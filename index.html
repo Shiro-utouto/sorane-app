@@ -473,8 +473,6 @@ function init(){
   const doorPivot = new THREE.Group();
   doorPivot.position.set(0, bay.y - 3.4, 1.5);
   player.add(doorPivot);
-  doorPivot.add(mainCas.group);
-  mainCas.group.position.set(0, 3.4, -0.95);
   const doorGeo = slab(11, 6.8, 0.5, 0.22, 0.06, [{w:7.4, h:2.6, r:0.3, x:0, y:0.5}]);
   const door = shadowy(new THREE.Mesh(doorGeo, graphite));
   door.position.y = 3.4;
@@ -1192,10 +1190,12 @@ function init(){
     if(portrait) hold.rotation.z = -Math.PI / 2;
     root.add(hold);
     const pivot = new THREE.Group(); pivot.position.y = -ds / 2; hold.add(pivot);
-    // the cassette sits in the door's holder, so it tilts out with the door and leaves through its free edge
-    const cas = buildCassette(pivot);
-    cas.group.position.set(0, ds / 2, -1.3);
-    P.cas = cas; P.casY = ds / 2;
+    // the cassette stays in the bay when the door opens; on eject it lifts out and leaves on the side away from the hinge
+    const cas = buildCassette(root);
+    cas.group.position.set(bay.x, bay.y, -1.3);
+    if(portrait) cas.group.rotation.z = -Math.PI / 2;
+    P.cas = cas; P.casAt = {x:bay.x, y:bay.y};
+    P.exit = portrait ? {x:1, y:0} : {x:0, y:1};
     cas.shell.userData.act = 'cassette'; P.picks.push(cas.shell);
     const win = {w:7.5, h:2.7, r:0.3, x:0, y:0.16};
     const dmesh = shadowy(new THREE.Mesh(slab(dl, ds, 0.5, 0.24, 0.07, [win]), graphite));
@@ -1305,7 +1305,7 @@ function init(){
   const demoRec = {id:'demo', demo:true, title:'秋の帰り道 mix', sub:'2026.10  for the walk home', color:'#e2553b', pos:0, mins:1};
   const tapes = [demoRec];
   let current = demoRec, rackMode = false, returnTo = 'orbit', busy = false;
-  const casAnim = {pop:0, fly:0};
+  const casAnim = {pop:0, fly:0, wide:0};
 
   // saved tapes live in this browser (IndexedDB); if storage is unavailable the rack still works for this visit
   const store = {db:null};
@@ -1613,6 +1613,7 @@ function init(){
     const wasOpen = !!state.doorTarget;
     if(!wasOpen) setDoor(true);
     current.pos = state.pos; saveTape(current);
+    tween(casAnim, 'wide', 1, 0.35, 'out');
     later(wasOpen ? 0 : 380, () => {
       sfx('eject');
       tween(casAnim, 'pop', 1, 0.16, 'out');
@@ -1652,7 +1653,7 @@ function init(){
     else { controls.enabled = true; }
     pHint.classList.add('fade');
     state.doorTarget = 1; state.door = 1; syncUI();
-    casAnim.pop = 0; casAnim.fly = 1;
+    casAnim.pop = 0; casAnim.fly = 1; casAnim.wide = 1;
     current = rec;
     try{ await Promise.race([prepareTape(rec), new Promise(r => setTimeout(r, 8000))]); }catch(e){}
     setTape(rec);
@@ -1660,7 +1661,7 @@ function init(){
     later(120, () => {
       tween(casAnim, 'fly', 0, 0.36, 'in', () => {
         sfx('insert');
-        later(300, () => { setDoor(false); busy = false; });
+        later(300, () => { setDoor(false); later(500, () => { casAnim.wide = 0; busy = false; }); });
       });
     });
   }
@@ -1839,16 +1840,21 @@ function init(){
     // door
     state.door += (state.doorTarget - state.door) * Math.min(1, dt * 7);
     const ease = state.door;
-    doorPivot.rotation.x = ease * 1.05;
+    doorPivot.rotation.x = ease * (1.05 + casAnim.wide * 0.45);
     runTweens(dt);
     const pop = casAnim.pop, fly = casAnim.fly;
-    mainCas.group.position.set(0, 3.4 + pop * 1.5 + fly * 17, -0.95 + pop * 0.3 + fly * fly * 10);
-    mainCas.group.rotation.x = -fly * 0.3;
+    // pop forward out of the bay, lift clear, then rise away over the open door
+    const lift = Math.min(fly * 5, 1), away = Math.max(0, fly - 0.2);
+    mainCas.group.position.set(0, bay.y + away * 14, 0.55 + pop * 0.5 + lift * 1.6 + fly * fly * 10);
+    mainCas.group.rotation.x = -away * 0.4;
     mainCas.group.visible = fly < 0.98;
     if(pm){
-      pm.door.rotation.x = ease * 1.0;
-      pm.cas.group.position.set(0, pm.casY + pop * 1.6 + fly * 18, -1.3 + pop * 0.3 + fly * fly * 14);
-      pm.cas.group.rotation.x = -fly * 0.3;
+      pm.door.rotation.x = ease * (1.0 + casAnim.wide * 0.5);
+      pm.cas.group.position.set(
+        pm.casAt.x + pm.exit.x * away * 16,
+        pm.casAt.y + pm.exit.y * away * 16 + fly * 2,
+        -1.3 + pop * 0.5 + lift * 2.4 + fly * fly * 14);
+      pm.cas.group.rotation.x = 0;
       pm.cas.group.visible = fly < 0.98;
     }
 
