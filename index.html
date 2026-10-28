@@ -791,6 +791,10 @@ function init(){
     } else if(type === 'eject'){
       burst(t, 1900, 2, 0.5, 0.02); thump(t, 120, 50, 0.5, 0.09);
       burst(t + 0.015, 1100, 6, 0.32, 0.22); ring(t + 0.015, 520, 0.045, 0.25);
+    } else if(type === 'lift'){
+      swish(t, 1200, 2000, 0.3, 0.12); burst(t + 0.02, 2400, 2, 0.15, 0.02);
+    } else if(type === 'swing'){
+      swish(t, 700, 1100, 0.35, 0.07);
     } else if(type === 'slide'){
       swish(t, 1700, 3200, 0.26, 0.2);
     } else if(type === 'rackIn'){
@@ -1006,7 +1010,7 @@ function init(){
     if(!!state.doorTarget === open) return;
     if(open && state.mode !== 'stop') setMode('stop');
     state.doorTarget = open ? 1 : 0;
-    sfx(open ? 'open' : 'close');
+    if(open) sfx('open'); else { sfx('swing'); state.latch = true; }
     syncUI();
   }
   function press(id){
@@ -1194,7 +1198,7 @@ function init(){
     const cas = buildCassette(root);
     cas.group.position.set(bay.x, bay.y, -1.3);
     if(portrait) cas.group.rotation.z = -Math.PI / 2;
-    P.cas = cas; P.casAt = {x:bay.x, y:bay.y};
+    P.cas = cas; P.portrait = portrait; P.casAt = {x:bay.x, y:bay.y};
     P.exit = portrait ? {x:1, y:0} : {x:0, y:1};
     cas.shell.userData.act = 'cassette'; P.picks.push(cas.shell);
     const win = {w:7.5, h:2.7, r:0.3, x:0, y:0.16};
@@ -1305,7 +1309,8 @@ function init(){
   const demoRec = {id:'demo', demo:true, title:'秋の帰り道 mix', sub:'2026.10  for the walk home', color:'#e2553b', pos:0, mins:1};
   const tapes = [demoRec];
   let current = demoRec, rackMode = false, returnTo = 'orbit', busy = false;
-  const casAnim = {pop:0, fly:0, wide:0};
+  // out: lifted clear of the bay (0 seated → 1 clear), slide: carried away (0 → 1 off screen), tilt: spring kick
+  const casAnim = {out:0, slide:0, tilt:0, wide:0};
 
   // saved tapes live in this browser (IndexedDB); if storage is unavailable the rack still works for this visit
   const store = {db:null};
@@ -1605,24 +1610,32 @@ function init(){
   const later = (ms, fn) => setTimeout(fn, reduceMotion ? 0 : ms);
 
   // ----- eject → rack, rack → insert -----
+  // a timeline of steps; each step waits for the last, so the motion reads one action at a time
+  function sequence(steps){
+    let t = 0;
+    steps.forEach(([wait, fn]) => { t += wait; later(t, fn); });
+  }
   function ejectToRack(){
     if(busy || rackMode) return;
     busy = true;
     ensureAudio();
-    if(state.mode !== 'stop') setMode('stop');
-    const wasOpen = !!state.doorTarget;
-    if(!wasOpen) setDoor(true);
+    const wasPlaying = state.mode !== 'stop';
+    if(wasPlaying) setMode('stop');
     current.pos = state.pos; saveTape(current);
-    tween(casAnim, 'wide', 1, 0.35, 'out');
-    later(wasOpen ? 0 : 380, () => {
-      sfx('eject');
-      tween(casAnim, 'pop', 1, 0.16, 'out');
-      later(520, () => {
-        sfx('slide');
-        tween(casAnim, 'fly', 1, 0.42, 'in');
-        later(260, () => fadeSwap(enterRack));
-      });
-    });
+    const closed = !state.doorTarget;
+    sequence([
+      // 1. door unlatches and swings open
+      [wasPlaying ? 380 : 0, () => { if(closed) setDoor(true); }],
+      // 2. it opens all the way
+      [closed ? 650 : 0, () => tween(casAnim, 'wide', 1, 0.55, 'inout')],
+      // 3. the spring kicks the cassette up out of its seat
+      [650, () => { sfx('eject'); tween(casAnim, 'tilt', 1, 0.2, 'out'); tween(casAnim, 'out', 0.35, 0.2, 'out'); }],
+      // 4. it is lifted clear of the bay
+      [520, () => { sfx('lift'); tween(casAnim, 'tilt', 0, 0.45, 'inout'); tween(casAnim, 'out', 1, 0.55, 'inout'); }],
+      // 5. and carried away
+      [800, () => { sfx('slide'); tween(casAnim, 'slide', 1, 0.8, 'in'); }],
+      [650, () => fadeSwap(enterRack)]
+    ]);
   }
   function enterRack(){
     returnTo = playerMode ? 'player' : 'orbit';
@@ -1630,7 +1643,7 @@ function init(){
     document.body.classList.add('rack');
     bExit.hidden = true;
     controls.enabled = false;
-    casAnim.pop = 0;
+    Object.assign(casAnim, {out:1, slide:1, tilt:0, wide:1});
     buildRack(); fitRackCam();
     const c = R.cases[current.id];
     if(c){ c.slide = 1.5; c.target = 0; c.wasOut = true; rackY = rackYT = clampRack(c.y0); }
@@ -1653,17 +1666,21 @@ function init(){
     else { controls.enabled = true; }
     pHint.classList.add('fade');
     state.doorTarget = 1; state.door = 1; syncUI();
-    casAnim.pop = 0; casAnim.fly = 1; casAnim.wide = 1;
+    Object.assign(casAnim, {out:1, slide:1, tilt:0, wide:1});
     current = rec;
     try{ await Promise.race([prepareTape(rec), new Promise(r => setTimeout(r, 8000))]); }catch(e){}
     setTape(rec);
     state.pos = Math.min(rec.pos || 0, tape.total);
-    later(120, () => {
-      tween(casAnim, 'fly', 0, 0.36, 'in', () => {
-        sfx('insert');
-        later(300, () => { setDoor(false); later(500, () => { casAnim.wide = 0; busy = false; }); });
-      });
-    });
+    sequence([
+      // 1. the cassette is brought in and held in front of the bay
+      [450, () => { sfx('slide'); tween(casAnim, 'slide', 0, 0.85, 'out'); }],
+      // 2. lined up, then pushed home — スチャッ
+      [1100, () => tween(casAnim, 'out', 0, 0.2, 'in', () => sfx('insert'))],
+      // 3. the door comes back up and closes with a click
+      [750, () => tween(casAnim, 'wide', 0, 0.5, 'inout')],
+      [450, () => setDoor(false)],
+      [900, () => { busy = false; }]
+    ]);
   }
   $('#bRackBack').addEventListener('click', () => { if(rackMode && !sheetOpen) chooseTape(current); });
   $('#bSongs').addEventListener('click', ejectToRack);
@@ -1799,7 +1816,7 @@ function init(){
   }
   function frame(){
     const dt = Math.min(clock.getDelta(), 0.05);
-    if(busy){ busyT += dt; if(busyT > 10){ busy = false; fadeEl.classList.remove('on'); } } else busyT = 0;
+    if(busy){ busyT += dt; if(busyT > 16){ busy = false; fadeEl.classList.remove('on'); } } else busyT = 0;
 
     // tape transport
     let v = 0;
@@ -1838,24 +1855,25 @@ function init(){
     });
 
     // door
-    state.door += (state.doorTarget - state.door) * Math.min(1, dt * 7);
+    state.door += (state.doorTarget - state.door) * Math.min(1, dt * 4.2);
+    if(state.latch && state.doorTarget === 0 && state.door < 0.04){ state.latch = false; sfx('close'); }
     const ease = state.door;
     doorPivot.rotation.x = ease * (1.05 + casAnim.wide * 0.45);
     runTweens(dt);
-    const pop = casAnim.pop, fly = casAnim.fly;
-    // pop forward out of the bay, lift clear, then rise away over the open door
-    const lift = Math.min(fly * 5, 1), away = Math.max(0, fly - 0.2);
-    mainCas.group.position.set(0, bay.y + away * 14, 0.55 + pop * 0.5 + lift * 1.6 + fly * fly * 10);
-    mainCas.group.rotation.x = -away * 0.4;
-    mainCas.group.visible = fly < 0.98;
+    const out = casAnim.out, sl = casAnim.slide, tl = casAnim.tilt;
+    // main view: lifts straight out of the bay, then rises away over the opened door
+    mainCas.group.position.set(0, bay.y + sl * 14, 0.55 + out * 1.9 + sl * 2.5);
+    mainCas.group.rotation.x = tl * 0.18 + sl * 0.2;
+    mainCas.group.visible = sl < 0.98;
     if(pm){
       pm.door.rotation.x = ease * (1.0 + casAnim.wide * 0.5);
       pm.cas.group.position.set(
-        pm.casAt.x + pm.exit.x * away * 16,
-        pm.casAt.y + pm.exit.y * away * 16 + fly * 2,
-        -1.3 + pop * 0.5 + lift * 2.4 + fly * fly * 14);
-      pm.cas.group.rotation.x = 0;
-      pm.cas.group.visible = fly < 0.98;
+        pm.casAt.x + pm.exit.x * sl * 17,
+        pm.casAt.y + pm.exit.y * sl * 17,
+        -1.3 + out * 2.8 + sl * 1.5);
+      if(pm.portrait) pm.cas.group.rotation.y = -tl * 0.18;
+      else pm.cas.group.rotation.x = tl * 0.18;
+      pm.cas.group.visible = sl < 0.98;
     }
 
     // wheel
