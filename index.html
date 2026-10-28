@@ -343,10 +343,9 @@ function init(){
   const bayFloor = new THREE.Mesh(new THREE.PlaneGeometry(bay.w, bay.h), darkMat);
   bayFloor.position.set(0, bay.y, 0.505);
   player.add(bayFloor);
-  [-2.1, 2.1].forEach(x => {
-    const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.5, 20), metal);
-    sp.rotation.x = Math.PI / 2; sp.position.set(x, bay.y + 0.15, 0.75);
-    player.add(sp);
+  const mainSpindles = [-2.1, 2.1].map(x => {
+    const sp = makeSpindle(0.655); sp.position.set(x, bay.y + 0.15, 0.505);
+    player.add(sp); return sp;
   });
   const head = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.45, 0.3), metal);
   head.position.set(0, -3.6, 0.7);
@@ -438,6 +437,23 @@ function init(){
     if(ui.tape) ui.tape.textContent = `${tape.cType} · SIDE A · ${tape.title}`;
   }
   const labelMat = new THREE.MeshStandardMaterial({map:labelTex, transparent:true, roughness:0.32});
+  const hubShape = new THREE.Shape(); hubShape.absarc(0, 0, 0.55, 0, Math.PI * 2, false);
+  const hubHolePath = new THREE.Path(); hubHolePath.absarc(0, 0, 0.32, 0, Math.PI * 2, true); hubShape.holes.push(hubHolePath);
+  const hubRingGeo = new THREE.ExtrudeGeometry(hubShape, {depth:0.34, bevelEnabled:false, curveSegments:40}); hubRingGeo.translate(0, 0, -0.17);
+  const hubHoleGeo = new THREE.CircleGeometry(0.32, 28);
+  // drive spindle: the shaft the cassette's hub drops onto; its splines turn the reel
+  function makeSpindle(len){
+    const g = new THREE.Group();
+    const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.36, 0.08, 28), metal);
+    collar.rotation.x = Math.PI / 2; collar.position.z = 0.04; g.add(collar);
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, len, 16), metal);
+    shaft.rotation.x = Math.PI / 2; shaft.position.z = len / 2; g.add(shaft);
+    for(let k = 0; k < 3; k++){
+      const rib = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.07, 0.24), metal);
+      rib.position.z = len - 0.12; rib.rotation.z = Math.PI / 6 + k * Math.PI / 3; g.add(rib);
+    }
+    return g;
+  }
   function buildCassette(parent){
     const group = new THREE.Group(); parent.add(group);
     const shellGeo = new THREE.BoxGeometry(10, 6.2, 0.85); shellGeo.translate(0, 0, 0.425);
@@ -450,10 +466,8 @@ function init(){
       const pack = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 0.3, 64), tapeMat);
       pack.rotation.x = Math.PI / 2; g.add(pack);
       const hub = new THREE.Group(); g.add(hub);
-      const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.34, 40), hubMat);
-      ring.rotation.x = Math.PI / 2; hub.add(ring);
-      const core = new THREE.Mesh(new THREE.CylinderGeometry(0.31, 0.31, 0.36, 28), darkMat);
-      core.rotation.x = Math.PI / 2; hub.add(core);
+      const ring = new THREE.Mesh(hubRingGeo, hubMat); hub.add(ring);
+      const hole = new THREE.Mesh(hubHoleGeo, darkMat); hole.position.z = 0.152; g.add(hole);
       for(let i = 0; i < 6; i++){
         const a = i / 6 * Math.PI * 2;
         const t = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.08, 0.37), hubMat);
@@ -1165,6 +1179,14 @@ function init(){
     face.position.z = -1.4; root.add(face);
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(fw + 2 * OV, fh + 2 * OV), darkMat);
     floor.position.z = -1.38; floor.receiveShadow = true; root.add(floor);
+    // the deck mechanism in the bay, turned the same way as the cassette
+    const mech = new THREE.Group(); mech.position.set(bay.x, bay.y, -1.375);
+    if(portrait) mech.rotation.z = -Math.PI / 2;
+    root.add(mech);
+    P.spindles = [-2.1, 2.1].map(x => { const sp = makeSpindle(0.685); sp.position.set(x, 0.15, 0); mech.add(sp); return sp; });
+    const headBlk = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.42, 0.42), metal); headBlk.position.set(0, -2.95, 0.21); mech.add(headBlk);
+    const roller = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.42, 20), darkMat); roller.rotation.x = Math.PI / 2; roller.position.set(1.6, -2.95, 0.21); mech.add(roller);
+    const capstan = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.5, 10), metal); capstan.rotation.x = Math.PI / 2; capstan.position.set(1.95, -2.95, 0.25); mech.add(capstan);
 
     // the top face, folded onto the front as a raised strip
     const st = shadowy(new THREE.Mesh(slab(strip.w, strip.h, 0.5, 0.45, 0.2), stripMat));
@@ -1627,9 +1649,9 @@ function init(){
       // 1. door unlatches and swings all the way open in one motion
       [wasPlaying ? 300 : 0, () => { if(closed) setDoor(true); tween(casAnim, 'wide', 1, 0.45, 'out'); }],
       // 2. the spring kicks the cassette up out of its seat
-      [closed ? 420 : 120, () => { sfx('eject'); tween(casAnim, 'tilt', 1, 0.14, 'out'); tween(casAnim, 'out', 0.35, 0.14, 'out'); }],
+      [closed ? 420 : 120, () => { sfx('eject'); tween(casAnim, 'out', 0.35, 0.14, 'out'); }],
       // 3. it is lifted clear of the bay
-      [260, () => { sfx('lift'); tween(casAnim, 'tilt', 0, 0.3, 'inout'); tween(casAnim, 'out', 1, 0.32, 'out'); }],
+      [260, () => { sfx('lift'); tween(casAnim, 'out', 1, 0.32, 'out'); }],
       // 4. and carried away
       [330, () => { sfx('slide'); tween(casAnim, 'slide', 1, 0.5, 'in'); }],
       [380, () => fadeSwap(enterRack)]
@@ -1838,6 +1860,9 @@ function init(){
       c.reelL.pack.scale.set(rL, 1, rL); c.reelR.pack.scale.set(rR, 1, rR);
       if(v){ c.reelL.hub.rotation.z -= (v / rL) * dt; c.reelR.hub.rotation.z -= (v / rR) * dt; }
     });
+    // the drive spindles turn with the reels they drive
+    mainSpindles[0].rotation.z = mainCas.reelL.hub.rotation.z; mainSpindles[1].rotation.z = mainCas.reelR.hub.rotation.z;
+    if(pm){ pm.spindles[0].rotation.z = pm.cas.reelL.hub.rotation.z; pm.spindles[1].rotation.z = pm.cas.reelR.hub.rotation.z; }
     const cn = Math.floor(state.pos) % 1000;
     ui.ctr.textContent = String(cn).padStart(3, '0');
     if(cn !== ctrShown){ ctrShown = cn; drawCounter(cn); }
