@@ -164,7 +164,52 @@ body.rack .rackbar{display:flex}
 .iconbtn:hover{border-color:var(--line)}
 .iconbtn:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .iconbtn:disabled{opacity:.25;cursor:default}
-.addbtn{justify-self:start;font-size:12px;padding:8px 13px}
+.sheet-kicker{margin:0;font-family:var(--f-mono);font-size:11px;letter-spacing:.16em;color:var(--muted);text-transform:uppercase}
+.jcard{
+  --tape:#e2553b;--paper:#f3ecdc;--ink2:#2a2c2f;--rule:rgba(42,44,47,.12);
+  background:var(--paper);color:var(--ink2);border-radius:10px;overflow:hidden;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.55),0 12px 32px rgba(0,0,0,.4);
+}
+.jc-band{
+  display:flex;align-items:center;gap:10px;padding:9px 14px;background:var(--tape);color:#fbf4ea;
+  font-family:var(--f-mono);font-size:11px;letter-spacing:.16em;
+}
+.jc-side{width:24px;height:24px;border-radius:50%;background:#fbf4ea;color:var(--tape);display:grid;place-items:center;font:700 13px var(--f-body);letter-spacing:0}
+.jc-sp{flex:1}
+.jc-body{padding:12px 16px 14px;display:grid;gap:8px}
+.jc-label{font-family:var(--f-mono);font-size:10px;letter-spacing:.2em;color:rgba(42,44,47,.5)}
+.sheet .jc-title{
+  font:400 24px Yomogi,'Zen Kaku Gothic New',cursive;color:var(--ink2);width:100%;
+  background:transparent;border:0;border-bottom:1.5px dashed rgba(42,44,47,.35);border-radius:0;padding:2px 2px 6px;
+}
+.sheet .jc-title:focus,.sheet .jc-title:focus-visible{outline:none;border-bottom:1.5px solid var(--tape)}
+.jc-meta{display:flex;justify-content:space-between;margin-top:4px;font-family:var(--f-mono);font-size:11px;letter-spacing:.12em;color:rgba(42,44,47,.6);font-variant-numeric:tabular-nums}
+.jc-meter{height:5px;border-radius:3px;background:rgba(42,44,47,.12);overflow:hidden}
+.jc-meter i{display:block;height:100%;background:var(--tape);border-radius:3px;transition:width .3s}
+.jc-meter.over i{background:#c0392b}
+.jc-warn,.jc-note{margin:0;font-size:12px;line-height:1.5;color:#b8452f}
+.jc-note{color:rgba(42,44,47,.6)}
+.jc-list{list-style:none;margin:4px -16px 0;padding:0 16px;max-height:min(34vh,280px);overflow-y:auto;-webkit-overflow-scrolling:touch;border-top:1px solid var(--rule)}
+.jc-list.sorting{overflow-y:hidden}
+.jc-row{
+  display:grid;grid-template-columns:1.8em minmax(0,1fr) auto 30px 34px;align-items:center;gap:6px;height:46px;
+  border-bottom:1px solid var(--rule);background:var(--paper);transition:transform .16s ease;position:relative;
+}
+.jc-row.single{grid-template-columns:1.8em minmax(0,1fr) auto}
+.jc-row.dragging{transition:none;z-index:2;background:#fbf7ec;border-radius:8px;border-bottom-color:transparent;box-shadow:0 10px 24px rgba(0,0,0,.22)}
+.jc-row .no{font:500 11px var(--f-mono);color:var(--tape);font-variant-numeric:tabular-nums}
+.jc-row .nm{font:400 19px Yomogi,'Zen Kaku Gothic New',cursive;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jc-row .du{font:500 11px var(--f-mono);color:rgba(42,44,47,.55);font-variant-numeric:tabular-nums}
+.jc-del{width:30px;height:30px;border:0;border-radius:8px;background:transparent;color:rgba(42,44,47,.4);font-size:17px;cursor:pointer}
+.jc-del:hover,.jc-del:focus-visible{color:#b8452f;background:rgba(42,44,47,.06);outline:none}
+.jc-grip{display:grid;place-items:center;height:46px;color:rgba(42,44,47,.38);cursor:grab;touch-action:none;-webkit-user-select:none;user-select:none}
+.jc-row.dragging .jc-grip{cursor:grabbing;color:var(--tape)}
+.jc-add{
+  justify-self:start;margin-top:6px;font:inherit;font-size:13px;color:var(--ink2);cursor:pointer;
+  padding:8px 14px;border-radius:999px;background:transparent;border:1.5px dashed rgba(42,44,47,.3);
+}
+.jc-add:hover,.jc-add:focus-visible{border-color:var(--tape);color:var(--tape);outline:none}
+@media (prefers-reduced-motion: reduce){.jc-row,.jc-meter i{transition:none}}
 @media (prefers-reduced-motion: reduce){#fade{transition:none}}
 
 @media (prefers-reduced-motion: reduce){.chip,.dot{transition:none}}
@@ -246,7 +291,7 @@ function init(){
   const dpr = window.devicePixelRatio || 1;
   const renderer = new THREE.WebGLRenderer({antialias:dpr < 2, alpha:true, powerPreference:'low-power'});
   renderer.setPixelRatio(Math.min(dpr, 2));
-  renderer.setSize(stage.clientWidth, stage.clientHeight);
+  renderer.setSize(stage.clientWidth, stage.clientHeight, false);
   renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 0.92;
@@ -1617,55 +1662,113 @@ function init(){
     const l = draft.list;
     return l.length === 1 ? l[0].name : `${l[0].name} ほか${l.length - 1}曲`;
   }
+  // ----- the tape you are recording: drawn as the cassette's paper insert (J-card) -----
   function renderDraft(note){
     const l = draft.list;
     if(!l.length){ draft = null; hideSheet(); return; }
     const secs = l.reduce((a, t) => a + t.dur, 0), mins = Math.max(1, Math.round(secs / 60));
     const tooLong = secs / 60 > MAX_MIN;
+    const cType = cTypeOf(secs / 60), cap = {'C-46':46, 'C-60':60, 'C-90':90, 'C-120':120}[cType] * 60;
+    const color = PALETTE[tapes.length % PALETTE.length];
     if(!draft.edited) draft.title = defaultTitle();
+    const prevScroll = sheet.querySelector('.jc-list') ? sheet.querySelector('.jc-list').scrollTop : 0;
+    const el = (tag, cls, text) => { const e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = text; return e; };
     showSheet(b => {
-      para(b, 'sheet-title', draft.single ? '1曲のテープ' : 'プレイリストのテープ');
-      const sub = para(b, 'sheet-sub', tooLong
-        ? `${l.length} 曲 · ${fmt(secs)}　カセットに入るのは ${MAX_MIN} 分（C-120）までです。曲を減らしてください。`
-        : `${l.length} 曲 · ${fmt(secs)} · ${cTypeOf(secs / 60)}`);
-      if(tooLong) sub.classList.add('warn');
-      if(note) para(b, 'sheet-sub', note);
-      if(!draft.single){
-        const box = document.createElement('div'); box.className = 'tracklist';
-        l.forEach((t, i) => {
-          const row = document.createElement('div'); row.className = 'track';
-          const no = document.createElement('span'); no.className = 'no'; no.textContent = String(i + 1).padStart(2, '0');
-          const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = t.name;
-          const du = document.createElement('span'); du.className = 'du'; du.textContent = fmt(t.dur);
-          const ops = document.createElement('span'); ops.className = 'ops';
-          const mk = (label, aria, dis, fn) => {
-            const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'iconbtn';
-            btn.textContent = label; btn.setAttribute('aria-label', aria); btn.disabled = dis;
-            btn.addEventListener('click', () => { fn(); sfx('tick'); renderDraft(); });
-            ops.appendChild(btn);
-          };
-          mk('↑', `${t.name} を上へ`, i === 0, () => { [l[i - 1], l[i]] = [l[i], l[i - 1]]; });
-          mk('↓', `${t.name} を下へ`, i === l.length - 1, () => { [l[i + 1], l[i]] = [l[i], l[i + 1]]; });
-          mk('×', `${t.name} を外す`, false, () => { l.splice(i, 1); });
-          row.append(no, nm, du, ops); box.appendChild(row);
-        });
-        b.appendChild(box);
-        const add = document.createElement('button'); add.type = 'button'; add.className = 'chip addbtn'; add.textContent = '＋ 曲を追加';
-        add.addEventListener('click', () => pickSongs('add'));
-        b.appendChild(add);
-      }
-      const lab = document.createElement('label'); lab.htmlFor = 'tapeTitle'; lab.textContent = 'ラベルに書く名前'; b.appendChild(lab);
-      const input = document.createElement('input'); input.id = 'tapeTitle'; input.type = 'text'; input.maxLength = 40; input.value = draft.title;
+      b.appendChild(el('p', 'sheet-kicker', draft.single ? '1曲のテープを録音' : 'プレイリストを録音'));
+      const card = el('div', 'jcard'); card.style.setProperty('--tape', color);
+      const band = el('div', 'jc-band');
+      band.append(el('span', 'jc-side', 'A'), el('span', 'jc-band-t', 'SIDE A'), el('span', 'jc-sp'), el('span', 'jc-band-t', tooLong ? 'OVER C-120' : cType));
+      card.appendChild(band);
+      const body = el('div', 'jc-body');
+      const lab = el('label', 'jc-label', 'TITLE'); lab.htmlFor = 'tapeTitle';
+      const input = el('input', 'jc-title'); input.id = 'tapeTitle'; input.type = 'text'; input.maxLength = 40; input.value = draft.title;
+      input.setAttribute('autocomplete', 'off');
       input.addEventListener('input', () => { draft.title = input.value; draft.edited = true; });
-      b.appendChild(input);
+      body.append(lab, input);
+      const meta = el('div', 'jc-meta');
+      meta.append(el('span', null, `${l.length} TRACK${l.length > 1 ? 'S' : ''}`), el('span', null, `${fmt(secs)} / ${tooLong ? '120:00' : fmt(cap)}`));
+      const meter = el('div', 'jc-meter' + (tooLong ? ' over' : '')); const fill = el('i'); fill.style.width = Math.min(100, secs / (tooLong ? 7200 : cap) * 100) + '%'; meter.appendChild(fill);
+      body.append(meta, meter);
+      if(tooLong) body.appendChild(el('p', 'jc-warn', `カセットに入るのは ${MAX_MIN} 分までです。曲を外してください。`));
+      if(note) body.appendChild(el('p', 'jc-note', note));
+      const list = el('ol', 'jc-list');
+      const rows = l.map((t, i) => {
+        const row = el('li', 'jc-row' + (draft.single ? ' single' : ''));
+        row.append(el('span', 'no', String(i + 1).padStart(2, '0')), el('span', 'nm', t.name), el('span', 'du', fmt(t.dur)));
+        if(!draft.single){
+          const del = el('button', 'jc-del', '×'); del.type = 'button'; del.setAttribute('aria-label', `${t.name} を外す`);
+          del.addEventListener('click', () => { l.splice(i, 1); sfx('tick'); renderDraft(); });
+          const grip = el('span', 'jc-grip'); grip.setAttribute('aria-label', 'ドラッグで並べ替え'); grip.setAttribute('role', 'button');
+          grip.innerHTML = '<svg viewBox="0 0 12 18" width="12" height="18" aria-hidden="true"><g fill="currentColor"><circle cx="3" cy="3" r="1.6"/><circle cx="9" cy="3" r="1.6"/><circle cx="3" cy="9" r="1.6"/><circle cx="9" cy="9" r="1.6"/><circle cx="3" cy="15" r="1.6"/><circle cx="9" cy="15" r="1.6"/></g></svg>';
+          row.append(del, grip);
+        }
+        list.appendChild(row);
+        return row;
+      });
+      body.appendChild(list);
+      if(!draft.single){
+        const add = el('button', 'jc-add', '＋ 曲を足す'); add.type = 'button';
+        add.addEventListener('click', () => pickSongs('add'));
+        body.appendChild(add);
+        attachDrag(list, rows, (from, to) => {
+          if(from !== to){ const [m] = l.splice(from, 1); l.splice(to, 0, m); }
+          renderDraft();
+        });
+      }
+      card.appendChild(body);
+      b.appendChild(card);
+      requestAnimationFrame(() => { list.scrollTop = prevScroll; });
     }, [
       {label:'やめる', fn:() => { draft = null; }},
       {label:'テープを作る', kind:'primary', disabled:tooLong, fn:() => {
         const title = (draft.title || '').trim() || defaultTitle();
-        const list = draft.list; draft = null;
-        createTape(list, title, mins);
+        const songs = draft.list; draft = null;
+        createTape(songs, title, mins);
       }}
     ]);
+  }
+  // drag a row by its grip; the others slide out of the way
+  function attachDrag(listEl, rows, onDrop){
+    rows.forEach((row, from) => {
+      const grip = row.querySelector('.jc-grip');
+      grip.addEventListener('pointerdown', e => {
+        e.preventDefault();
+        try{ grip.setPointerCapture(e.pointerId); }catch(err){}
+        const rects = rows.map(r => r.getBoundingClientRect());
+        const pitch = rects.length > 1 ? rects[1].top - rects[0].top : rects[0].height;
+        const startY = e.clientY, startScroll = listEl.scrollTop;
+        let to = from, last = e.clientY, raf = 0;
+        row.classList.add('dragging'); listEl.classList.add('sorting'); sfx('tick');
+        const place = () => {
+          const dy = last - startY + (listEl.scrollTop - startScroll);
+          row.style.transform = `translateY(${dy}px) scale(1.02)`;
+          const t = Math.max(0, Math.min(rows.length - 1, Math.round(from + dy / pitch)));
+          if(t !== to){ to = t; sfx('tick'); }
+          rows.forEach((r, i) => {
+            if(r === row) return;
+            let s = 0;
+            if(from < to && i > from && i <= to) s = -pitch;
+            if(to < from && i >= to && i < from) s = pitch;
+            r.style.transform = s ? `translateY(${s}px)` : '';
+          });
+        };
+        const scroller = () => {
+          const lr = listEl.getBoundingClientRect();
+          if(last < lr.top + 36) listEl.scrollTop -= 6;
+          else if(last > lr.bottom - 36) listEl.scrollTop += 6;
+          place();
+          raf = requestAnimationFrame(scroller);
+        };
+        const move = ev => { last = ev.clientY; place(); };
+        const up = () => {
+          cancelAnimationFrame(raf);
+          grip.removeEventListener('pointermove', move); grip.removeEventListener('pointerup', up); grip.removeEventListener('pointercancel', up);
+          onDrop(from, to);
+        };
+        grip.addEventListener('pointermove', move); grip.addEventListener('pointerup', up); grip.addEventListener('pointercancel', up);
+        raf = requestAnimationFrame(scroller);
+      });
+    });
   }
   function createTape(list, title, mins){
     const rec = {
@@ -1907,9 +2010,11 @@ function init(){
   });
 
   // ---------- resize ----------
+  let lastW = 0, lastH = 0;
   function onResize(){
     const w = stage.clientWidth, h = stage.clientHeight;
-    renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();
+    lastW = w; lastH = h;
+    renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
     if(playerMode) buildPM();
     if(rackMode){ buildRack(); fitRackCam(); }
   }
@@ -1926,6 +2031,7 @@ function init(){
   }
   function frame(){
     const dt = Math.min(clock.getDelta(), 0.05);
+    if(stage.clientWidth !== lastW || stage.clientHeight !== lastH) onResize();
     if(busy){ busyT += dt; if(busyT > 16){ busy = false; fadeEl.classList.remove('on'); } } else busyT = 0;
 
     // tape transport
