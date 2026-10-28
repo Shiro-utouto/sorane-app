@@ -1,0 +1,1913 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#121314">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SR-28">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<style>
+*,::before,::after{box-sizing:border-box}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;font-size:14px;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+[hidden]{display:none!important}
+</style>
+<title>SORANE SR-28</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Michroma&family=Yomogi&family=Zen+Kaku+Gothic+New:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: full-bleed 3D stage; name plate + tape status top-left; transport chips docked at the bottom */
+:root{
+  --stage:#121314;
+  --stage-hi:#2b2d2f;
+  --ink:#ece7dc;
+  --muted:#8f8b82;
+  --line:rgba(236,231,220,.16);
+  --glass:rgba(18,19,20,.62);
+  --accent:#e2553b;
+  --f-display:'Michroma','Eurostile','Arial Narrow',sans-serif;
+  --f-body:'Zen Kaku Gothic New','Hiragino Sans','Noto Sans JP',system-ui,sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{
+  background:var(--stage);color:var(--ink);font-family:var(--f-body);
+  overflow:hidden;-webkit-user-select:none;user-select:none;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+}
+#stage{position:fixed;inset:0;background:radial-gradient(120% 80% at 50% 40%,var(--stage-hi) 0%,var(--stage) 64%)}
+#stage canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab;outline:none}
+#stage canvas.hot{cursor:pointer}
+
+.plate{
+  position:fixed;z-index:2;pointer-events:none;
+  top:calc(env(safe-area-inset-top,0px) + 18px);
+  left:max(16px,env(safe-area-inset-left,0px));
+  right:max(16px,env(safe-area-inset-right,0px));
+  display:grid;gap:6px;
+}
+.model{font-family:var(--f-display);font-size:22px;letter-spacing:.08em;line-height:1}
+.maker{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.16em;color:var(--muted);text-transform:uppercase}
+.status{
+  margin-top:6px;display:flex;align-items:center;gap:10px;
+  font-family:var(--f-mono);font-size:12px;letter-spacing:.1em;font-variant-numeric:tabular-nums;
+}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted);transition:background .2s,box-shadow .2s}
+.dot.on{background:var(--accent);box-shadow:0 0 10px var(--accent)}
+.sep{width:1px;height:12px;background:var(--line)}
+.ctr{
+  padding:2px 6px;border:1px solid var(--line);border-radius:3px;
+  background:rgba(0,0,0,.35);letter-spacing:.22em;
+}
+.tape{font-size:12px;color:var(--muted)}
+
+#loading{
+  position:fixed;inset:0;display:grid;place-items:center;z-index:1;
+  font-family:var(--f-mono);font-size:12px;letter-spacing:.14em;color:var(--muted);
+  padding:0 24px;text-align:center;
+}
+
+.dock{
+  position:fixed;z-index:2;
+  left:max(16px,env(safe-area-inset-left,0px));
+  right:max(16px,env(safe-area-inset-right,0px));
+  bottom:calc(env(safe-area-inset-bottom,0px) + 16px);
+  display:grid;gap:10px;justify-items:center;
+}
+.hint{margin:0;font-size:12px;color:var(--muted);text-align:center;text-wrap:balance;max-width:34em}
+.chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.chip{
+  font:inherit;font-size:13px;color:var(--ink);
+  padding:10px 15px;border-radius:999px;border:1px solid var(--line);
+  background:var(--glass);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  cursor:pointer;transition:border-color .15s,background .15s,transform .1s;
+}
+.chip:hover{border-color:rgba(236,231,220,.36)}
+.chip:active{transform:translateY(1px)}
+.chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.chip.primary{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 22%,var(--glass))}
+.chip[aria-pressed="false"]{color:var(--muted)}
+.chip .mono{font-family:var(--f-mono);margin-right:4px}
+.plate,.dock{transition:opacity .35s ease,visibility .35s}
+body.player .plate,body.player .dock{opacity:0;visibility:hidden;pointer-events:none}
+#bExit{
+  position:fixed;z-index:3;
+  bottom:calc(env(safe-area-inset-bottom,0px) + 14px);
+  left:max(14px,env(safe-area-inset-left,0px));
+  padding:8px 13px;font-size:12px;opacity:.7;
+}
+#bExit:hover,#bExit:focus-visible{opacity:1}
+.phint{
+  position:fixed;z-index:3;left:50%;transform:translateX(-50%);
+  bottom:calc(env(safe-area-inset-bottom,0px) + 64px);
+  width:max-content;max-width:calc(100% - 32px);
+  padding:9px 14px;border-radius:8px;border:1px solid var(--line);
+  background:var(--glass);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  font-size:12px;line-height:1.6;text-align:center;text-wrap:balance;
+  transition:opacity .5s;pointer-events:none;
+}
+.phint.fade{opacity:0}
+body.rack .plate,body.rack .dock{opacity:0;visibility:hidden;pointer-events:none}
+.rackbar{
+  position:fixed;z-index:3;display:none;align-items:center;gap:12px;
+  top:calc(env(safe-area-inset-top,0px) + 12px);
+  left:max(14px,env(safe-area-inset-left,0px));
+}
+body.rack .rackbar{display:flex}
+.rack-title{font-family:var(--f-display);font-size:12px;letter-spacing:.16em;text-shadow:0 1px 8px rgba(0,0,0,.6)}
+#fade{position:fixed;inset:0;z-index:5;background:var(--stage);opacity:0;pointer-events:none;transition:opacity .28s ease}
+#fade.on{opacity:1}
+.sheet{
+  position:fixed;z-index:6;
+  left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));
+  bottom:calc(env(safe-area-inset-bottom,0px) + 12px);
+  max-width:440px;margin:0 auto;padding:18px;border-radius:16px;
+  background:rgba(24,25,27,.95);border:1px solid var(--line);
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+  box-shadow:0 18px 50px rgba(0,0,0,.45);
+  display:grid;gap:14px;
+}
+.sheet-body{display:grid;gap:8px}
+.sheet-title{margin:0;font-size:16px;font-weight:700;line-height:1.5}
+.sheet-sub{margin:0;font-size:12px;color:var(--muted);line-height:1.6}
+.sheet label{font-size:12px;color:var(--muted);margin-top:4px}
+.sheet input{
+  font:inherit;font-size:16px;color:var(--ink);width:100%;box-sizing:border-box;
+  background:rgba(0,0,0,.35);border:1px solid var(--line);border-radius:10px;padding:11px 12px;
+}
+.sheet input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.sheet-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.chip.danger{border-color:#d64a3a;background:rgba(214,74,58,.24)}
+@media (prefers-reduced-motion: reduce){#fade{transition:none}}
+
+@media (prefers-reduced-motion: reduce){.chip,.dot{transition:none}}
+@media (orientation: landscape){
+  #bExit{bottom:auto;left:auto;top:calc(env(safe-area-inset-top,0px) + 14px);right:max(14px,env(safe-area-inset-right,0px))}
+}
+</style>
+</head>
+<body>
+
+
+<div id="stage"></div>
+
+<header class="plate">
+  <div class="model">SR-28</div>
+  <div class="maker">Sorane · Stereo Cassette Player</div>
+  <div class="status">
+    <span class="dot" id="dot"></span>
+    <span id="mode">STOP</span>
+    <span class="sep"></span>
+    <span class="ctr" id="ctr">000</span>
+  </div>
+  <div class="tape" id="tapeName">C-46 · SIDE A · 秋の帰り道 mix</div>
+</header>
+
+<div id="loading">LOADING…</div>
+
+<footer class="dock">
+  <p class="hint" id="hint">ドラッグで回転、ピンチで拡大。キーやフタも押せます。フタを開けてカセットをタップすると、テープラックに切り替わります。</p>
+  <div class="chips">
+    <button id="bPlay" class="chip primary" type="button"><span class="mono">▶</span>再生</button>
+    <button id="bPlayer" class="chip" type="button">全画面プレーヤー</button>
+    <button id="bSongs" class="chip" type="button">テープラック</button>
+    <button id="bDoor" class="chip" type="button">フタを開ける</button>
+    <button id="bAuto" class="chip" type="button" aria-pressed="true">自動回転</button>
+    <button id="bReset" class="chip" type="button">視点リセット</button>
+  </div>
+</footer>
+
+<button id="bExit" class="chip" type="button" hidden>終了</button>
+<div class="phint fade" id="pHint" aria-live="polite"></div>
+<div class="rackbar" id="rackBar">
+  <button id="bRackBack" class="chip" type="button">戻る</button>
+  <span class="rack-title">TAPE RACK</span>
+</div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" hidden></div>
+<div id="fade"></div>
+
+<script src="vendor/three.min.js"></script>
+<script src="vendor/OrbitControls.js"></script>
+<script src="vendor/RoomEnvironment.js"></script>
+<script>
+(function(){
+const $ = s => document.querySelector(s);
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function fontsReady(){
+  try{
+    return Promise.race([
+      Promise.all([
+        document.fonts.load('400 64px Michroma'),
+        document.fonts.load('400 64px Yomogi'),
+        document.fonts.load('500 32px "IBM Plex Mono"'),
+        document.fonts.load('700 32px "Zen Kaku Gothic New"')
+      ]),
+      new Promise(r => setTimeout(r, 2500))
+    ]).catch(()=>{});
+  }catch(e){ return Promise.resolve(); }
+}
+
+fontsReady().then(init);
+
+function init(){
+  if(!window.THREE || !THREE.OrbitControls){
+    $('#loading').textContent = '3Dの読み込みに失敗しました。通信を確認して、ページを再読み込みしてください。';
+    return;
+  }
+  const stage = $('#stage');
+  const dpr = window.devicePixelRatio || 1;
+  const renderer = new THREE.WebGLRenderer({antialias:dpr < 2, alpha:true, powerPreference:'low-power'});
+  renderer.setPixelRatio(Math.min(dpr, 2));
+  renderer.setSize(stage.clientWidth, stage.clientHeight);
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 0.92;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.autoUpdate = false;
+  stage.appendChild(renderer.domElement);
+  $('#loading').hidden = true;
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(32, stage.clientWidth / stage.clientHeight, 0.1, 300);
+
+  // ---------- environment & lights ----------
+  if(THREE.RoomEnvironment){
+    const pm = new THREE.PMREMGenerator(renderer);
+    scene.environment = pm.fromScene(new THREE.RoomEnvironment(), 0.04).texture;
+  }
+  scene.add(new THREE.HemisphereLight(0xfff4e6, 0x1a1a1a, scene.environment ? 0.25 : 0.7));
+  const key = new THREE.DirectionalLight(0xfff1e0, 1.5);
+  key.position.set(8, 16, 11);
+  key.castShadow = true;
+  key.shadow.mapSize.set(1024, 1024);
+  const sc = key.shadow.camera; sc.left = -14; sc.right = 14; sc.top = 14; sc.bottom = -14; sc.near = 1; sc.far = 50;
+  key.shadow.bias = -0.0008; key.shadow.radius = 4;
+  scene.add(key);
+  const rim = new THREE.DirectionalLight(0x9fc4ff, 0.55);
+  rim.position.set(-12, 5, -9);
+  scene.add(rim);
+
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.ShadowMaterial({opacity:0.38}));
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -4.87;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  // ---------- helpers ----------
+  const aniso = renderer.capabilities.getMaxAnisotropy();
+  function canvasTex(w, h, draw, scale = 1){
+    const c = document.createElement('canvas'); c.width = Math.round(w * scale); c.height = Math.round(h * scale);
+    const g = c.getContext('2d'); if(scale !== 1) g.scale(scale, scale); draw(g, w, h);
+    const t = new THREE.CanvasTexture(c);
+    t.encoding = THREE.sRGBEncoding; t.anisotropy = Math.min(4, aniso);
+    return t;
+  }
+  function spaced(g, text, x, y, sp){
+    for(const ch of text){ g.fillText(ch, x, y); x += g.measureText(ch).width + sp; }
+  }
+  function roundRect(g, x, y, w, h, r){
+    g.beginPath();
+    g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+    g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+  }
+  function decal(w, h, tex, opts = {}){
+    const m = new THREE.MeshStandardMaterial({
+      map:tex, transparent:true, roughness:opts.rough ?? 0.6, metalness:0,
+      polygonOffset:true, polygonOffsetFactor:-2, depthWrite:false
+    });
+    m.userData.disposable = true;
+    return new THREE.Mesh(new THREE.PlaneGeometry(w, h), m);
+  }
+  function rrShape(w, h, r, cx = 0, cy = 0, PathType = THREE.Shape){
+    const s = new PathType(); const x = cx - w / 2, y = cy - h / 2;
+    s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r);
+    s.lineTo(x + w, y + h - r); s.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    s.lineTo(x + r, y + h); s.quadraticCurveTo(x, y + h, x, y + h - r);
+    s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y);
+    return s;
+  }
+  // rounded slab spanning z = 0..depth, with optional rounded-rect holes
+  function slab(w, h, r, depth, bevel, holes = []){
+    const s = rrShape(w - 2 * bevel, h - 2 * bevel, Math.max(0.02, r - bevel));
+    holes.forEach(o => s.holes.push(rrShape(o.w + 2 * bevel, o.h + 2 * bevel, o.r + bevel, o.x, o.y, THREE.Path)));
+    const geo = new THREE.ExtrudeGeometry(s, {
+      depth:depth - 2 * bevel, bevelEnabled:true, bevelThickness:bevel, bevelSize:bevel,
+      bevelSegments:4, curveSegments:18
+    });
+    geo.translate(0, 0, bevel);
+    return geo;
+  }
+  const shadowy = m => { m.castShadow = true; m.receiveShadow = true; return m; };
+
+  // ---------- materials ----------
+  const bodyMat = new THREE.MeshStandardMaterial({color:0x93a596, roughness:0.55, metalness:0.0});
+  const graphite = new THREE.MeshStandardMaterial({color:0x2a2c2f, roughness:0.38, metalness:0.25});
+  const darkMat = new THREE.MeshStandardMaterial({color:0x141516, roughness:0.85});
+  const metal = new THREE.MeshStandardMaterial({color:0xc9ccd0, roughness:0.28, metalness:1.0});
+  const darkPlastic = new THREE.MeshStandardMaterial({color:0x232528, roughness:0.4});
+  const tapeMat = new THREE.MeshStandardMaterial({color:0x3b2a20, roughness:0.45, metalness:0.1});
+  const hubMat = new THREE.MeshStandardMaterial({color:0xf2efe8, roughness:0.4});
+  const glassMat = new THREE.MeshStandardMaterial({
+    color:0xbcd0d8, transparent:true, opacity:0.16, roughness:0.04, metalness:0.1,
+    envMapIntensity:1.6, depthWrite:false
+  });
+  const keyLight = new THREE.MeshStandardMaterial({color:0xd8d2c4, roughness:0.5});
+  const keyCoral = new THREE.MeshStandardMaterial({color:0xe2553b, roughness:0.45});
+
+  [bodyMat, graphite, darkMat, darkPlastic, tapeMat, hubMat, keyLight, keyCoral].forEach(m => { m.envMapIntensity = 0.55; });
+  const player = new THREE.Group();
+  scene.add(player);
+  const W = 13, H = 9.4, D = 3, TOP = H / 2;
+
+  // ---------- body: back shell + front frame (parting line between) ----------
+  const back = shadowy(new THREE.Mesh(slab(W, H, 0.9, 2, 0.18), bodyMat));
+  back.position.z = -1.5;
+  player.add(back);
+  const bay = {w:10.6, h:6.4, x:0, y:-0.7};
+  const front = shadowy(new THREE.Mesh(slab(W, H, 0.9, 1, 0.18, [{w:bay.w, h:bay.h, r:0.35, x:bay.x, y:bay.y}]), bodyMat));
+  front.position.z = 0.5;
+  player.add(front);
+
+  // bay interior
+  const bayFloor = new THREE.Mesh(new THREE.PlaneGeometry(bay.w, bay.h), darkMat);
+  bayFloor.position.set(0, bay.y, 0.505);
+  player.add(bayFloor);
+  [-2.1, 2.1].forEach(x => {
+    const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.5, 20), metal);
+    sp.rotation.x = Math.PI / 2; sp.position.set(x, bay.y + 0.15, 0.75);
+    player.add(sp);
+  });
+  const head = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.45, 0.3), metal);
+  head.position.set(0, -3.6, 0.7);
+  player.add(head);
+
+  // brand band
+  const brandTex = canvasTex(2400, 340, (g) => {
+    g.fillStyle = '#23262a';
+    g.font = '400 112px Michroma, "Arial Narrow", sans-serif';
+    spaced(g, 'SORANE', 70, 210, 26);
+    g.fillStyle = '#e2553b';
+    g.fillRect(74, 252, 64, 10);
+    g.fillStyle = '#2c3034';
+    g.textAlign = 'right';
+    g.font = '500 34px "IBM Plex Mono", monospace';
+    g.fillText('S T E R E O   C A S S E T T E   P L A Y E R', 2330, 140);
+    g.font = '400 72px Michroma, "Arial Narrow", sans-serif';
+    g.fillText('SR-28', 2330, 250);
+  }, 0.7);
+  const brand = decal(12, 1.7, brandTex);
+  brand.position.set(0, 3.62, 1.502);
+  player.add(brand);
+
+  // ---------- cassette ----------
+  let labelTitle = '秋の帰り道 mix', labelSub = '2026.10  for the walk home', labelColor = '#e2553b', labelC = 'C-46';
+  function paintLabel(g, w, h){
+    g.fillStyle = '#26282b'; g.fillRect(0, 0, w, h);
+    // label
+    roundRect(g, 40, 28, 920, 404, 18); g.fillStyle = '#efe7d3'; g.fill();
+    g.save(); roundRect(g, 40, 28, 920, 404, 18); g.clip();
+    g.fillStyle = labelColor; g.fillRect(40, 28, 920, 46);
+    g.fillStyle = '#d9a441'; g.fillRect(40, 74, 920, 14);
+    g.restore();
+    g.fillStyle = '#efe7d3'; g.font = '500 26px "IBM Plex Mono", monospace';
+    g.fillText(labelC, 870, 60);
+    // side letter
+    g.beginPath(); g.arc(98, 140, 30, 0, Math.PI * 2); g.fillStyle = '#2a2c2f'; g.fill();
+    g.fillStyle = '#efe7d3'; g.font = '700 36px "Zen Kaku Gothic New", sans-serif';
+    g.textAlign = 'center'; g.fillText('A', 98, 153); g.textAlign = 'left';
+    // writing lines + handwritten title
+    g.strokeStyle = 'rgba(42,44,47,.25)'; g.lineWidth = 2;
+    [168, 404].forEach(y => { g.beginPath(); g.moveTo(150, y); g.lineTo(930, y); g.stroke(); });
+    g.fillStyle = '#2a2c2f';
+    let fs = 50; g.font = `400 ${fs}px Yomogi, cursive`;
+    while(fs > 28 && g.measureText(labelTitle).width > 770){ fs -= 2; g.font = `400 ${fs}px Yomogi, cursive`; }
+    let tt = labelTitle;
+    while(tt.length > 1 && g.measureText(tt).width > 770) tt = tt.slice(0, -2) + '…';
+    g.fillText(tt, 152, 158);
+    g.font = '400 30px Yomogi, cursive'; g.textAlign = 'right';
+    g.fillText(labelSub, 930, 396); g.textAlign = 'left';
+    // window
+    g.save();
+    roundRect(g, 180, 208, 640, 172, 24);
+    g.globalCompositeOperation = 'destination-out'; g.fill();
+    g.restore();
+    roundRect(g, 180, 208, 640, 172, 24);
+    g.fillStyle = 'rgba(200,220,232,.10)'; g.fill();
+    g.strokeStyle = 'rgba(20,20,22,.9)'; g.lineWidth = 6; g.stroke();
+    // remaining-tape scale
+    g.fillStyle = 'rgba(240,236,226,.7)';
+    for(let i = 0; i <= 12; i++){
+      const x = 380 + i * 20;
+      g.fillRect(x, 352, 2, i % 6 === 0 ? 18 : 10);
+    }
+    g.font = '500 14px "IBM Plex Mono", monospace'; g.textAlign = 'center';
+    g.fillText('0', 381, 346); g.fillText('15', 501, 346); g.fillText('30', 621, 346);
+    g.textAlign = 'left';
+    // lower shell: head-access area
+    g.fillStyle = '#2d3034';
+    g.beginPath(); g.moveTo(190, 620); g.lineTo(240, 462); g.lineTo(760, 462); g.lineTo(810, 620); g.closePath(); g.fill();
+    g.fillStyle = '#0e0f10';
+    [[290, 540, 34, 34], [676, 540, 34, 34], [468, 552, 64, 40]].forEach(r => g.fillRect(...r));
+    [[350, 590], [650, 590]].forEach(([x, y]) => { g.beginPath(); g.arc(x, y, 13, 0, Math.PI * 2); g.fill(); });
+    // screws
+    [[24, 22], [976, 22], [24, 598], [976, 598], [500, 450]].forEach(([x, y]) => {
+      g.beginPath(); g.arc(x, y, 11, 0, Math.PI * 2); g.fillStyle = '#4a4e53'; g.fill();
+      g.strokeStyle = '#1b1c1e'; g.lineWidth = 3;
+      g.beginPath(); g.moveTo(x - 6, y); g.lineTo(x + 6, y); g.moveTo(x, y - 6); g.lineTo(x, y + 6); g.stroke();
+    });
+    g.fillStyle = 'rgba(239,231,211,.55)'; g.font = '500 16px "IBM Plex Mono", monospace';
+    g.fillText('NORMAL POSITION · TYPE I', 40, 452);
+  }
+  const labelTex = canvasTex(1000, 620, paintLabel);
+  function relabel(){
+    labelTitle = tape.title; labelSub = tape.sub; labelColor = tape.color; labelC = tape.cType;
+    const c = labelTex.image, g = c.getContext('2d');
+    g.save(); g.globalCompositeOperation = 'source-over'; g.clearRect(0, 0, c.width, c.height); g.restore();
+    paintLabel(g, c.width, c.height); labelTex.needsUpdate = true;
+    if(ui.tape) ui.tape.textContent = `${tape.cType} · SIDE A · ${tape.title}`;
+  }
+  const labelMat = new THREE.MeshStandardMaterial({map:labelTex, transparent:true, roughness:0.32});
+  function buildCassette(parent){
+    const group = new THREE.Group(); parent.add(group);
+    const shellGeo = new THREE.BoxGeometry(10, 6.2, 0.85); shellGeo.translate(0, 0, 0.425);
+    const shell = shadowy(new THREE.Mesh(shellGeo, [darkPlastic, darkPlastic, darkPlastic, darkPlastic, labelMat, darkPlastic]));
+    group.add(shell);
+    const inner = new THREE.Mesh(new THREE.PlaneGeometry(9.8, 6.0), darkPlastic);
+    inner.position.z = 0.06; group.add(inner);
+    function makeReel(x){
+      const g = new THREE.Group(); g.position.set(x, 0.15, 0.45);
+      const pack = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 0.3, 64), tapeMat);
+      pack.rotation.x = Math.PI / 2; g.add(pack);
+      const hub = new THREE.Group(); g.add(hub);
+      const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.34, 40), hubMat);
+      ring.rotation.x = Math.PI / 2; hub.add(ring);
+      const core = new THREE.Mesh(new THREE.CylinderGeometry(0.31, 0.31, 0.36, 28), darkMat);
+      core.rotation.x = Math.PI / 2; hub.add(core);
+      for(let i = 0; i < 6; i++){
+        const a = i / 6 * Math.PI * 2;
+        const t = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.08, 0.37), hubMat);
+        t.position.set(Math.cos(a) * 0.25, Math.sin(a) * 0.25, 0); t.rotation.z = a; hub.add(t);
+      }
+      const mark = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.06, 0.35), darkMat);
+      mark.position.set(0.44, 0, 0.01); hub.add(mark);
+      group.add(g);
+      return {pack, hub};
+    }
+    return {group, shell, reelL:makeReel(-2.1), reelR:makeReel(2.1)};
+  }
+  const mainCas = buildCassette(player);
+  mainCas.group.position.set(0, bay.y, 0.55);
+
+  // ---------- door (hinged at the bottom) ----------
+  const doorPivot = new THREE.Group();
+  doorPivot.position.set(0, bay.y - 3.4, 1.5);
+  player.add(doorPivot);
+  doorPivot.add(mainCas.group);
+  mainCas.group.position.set(0, 3.4, -0.95);
+  const doorGeo = slab(11, 6.8, 0.5, 0.22, 0.06, [{w:7.4, h:2.6, r:0.3, x:0, y:0.5}]);
+  const door = shadowy(new THREE.Mesh(doorGeo, graphite));
+  door.position.y = 3.4;
+  doorPivot.add(door);
+  const glass = new THREE.Mesh(new THREE.PlaneGeometry(7.6, 2.8), glassMat);
+  glass.position.set(0, 3.9, 0.11);
+  doorPivot.add(glass);
+  const doorText = decal(9, 0.6, canvasTex(1800, 120, (g) => {
+    g.fillStyle = 'rgba(222,216,203,.85)';
+    g.font = '500 40px "IBM Plex Mono", monospace'; g.textAlign = 'center';
+    g.fillText('AUTO STOP  ·  NORMAL / HIGH POSITION', 900, 76);
+  }));
+  doorText.position.set(0, 3.4 - 2.15, 0.225);
+  doorPivot.add(doorText);
+  for(let i = 0; i < 5; i++){
+    const r = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.06, 0.05), metal);
+    r.position.set(0, 3.4 + 2.55 + i * 0.13, 0.245);
+    doorPivot.add(r);
+  }
+  const hinge = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 10.2, 16), metal);
+  hinge.rotation.z = Math.PI / 2; hinge.position.set(0, bay.y - 3.4, 1.56);
+  player.add(hinge);
+
+  // ---------- top: transport keys ----------
+  const slot = new THREE.Mesh(new THREE.PlaneGeometry(5.7, 2.0), darkMat);
+  slot.rotation.x = -Math.PI / 2; slot.position.set(2.45, TOP + 0.004, 0);
+  player.add(slot);
+
+  const iconCache = new Map();
+  function iconTex(type, color){
+    const key = type + color;
+    if(!iconCache.has(key)) iconCache.set(key, makeIcon(type, color));
+    return iconCache.get(key);
+  }
+  function makeIcon(type, color){
+    return canvasTex(256, 256, (g) => {
+      g.fillStyle = color;
+      const tri = (x0, dir) => { g.beginPath(); g.moveTo(x0, 78); g.lineTo(x0, 178); g.lineTo(x0 + 76 * dir, 128); g.closePath(); g.fill(); };
+      if(type === 'play'){ g.beginPath(); g.moveTo(88, 64); g.lineTo(88, 192); g.lineTo(196, 128); g.closePath(); g.fill(); }
+      if(type === 'ff'){ tri(52, 1); tri(128, 1); }
+      if(type === 'rew'){ tri(204, -1); tri(128, -1); }
+      if(type === 'stop'){
+        g.fillRect(40, 98, 62, 62);
+        g.beginPath(); g.moveTo(140, 146); g.lineTo(214, 146); g.lineTo(177, 98); g.closePath(); g.fill();
+        g.fillRect(140, 158, 74, 14);
+      }
+    });
+  }
+  const keys = {};
+  const keyDefs = [
+    {id:'stop', x:0.35, mat:graphite, icon:'#ece7dc'},
+    {id:'rew', x:1.75, mat:keyLight, icon:'#2a2c2f'},
+    {id:'play', x:3.15, mat:keyCoral, icon:'#fbf4ea'},
+    {id:'ff', x:4.55, mat:keyLight, icon:'#2a2c2f'}
+  ];
+  const keyGeo = slab(1.22, 1.7, 0.2, 0.55, 0.08);
+  keyGeo.rotateX(-Math.PI / 2);
+  keyDefs.forEach(k => {
+    const m = shadowy(new THREE.Mesh(keyGeo, k.mat));
+    m.position.set(k.x, TOP - 0.2, 0);
+    m.userData.act = k.id;
+    const ic = decal(0.72, 0.72, iconTex(k.id, k.icon), {rough:0.5});
+    ic.rotation.x = -Math.PI / 2; ic.position.set(0, 0.552, 0);
+    ic.userData.act = k.id;
+    m.add(ic);
+    player.add(m);
+    keys[k.id] = {mesh:m, down:0, target:0};
+  });
+
+  const led = new THREE.Mesh(new THREE.SphereGeometry(0.1, 16, 12),
+    new THREE.MeshStandardMaterial({color:0x3a1a14, emissive:0xff4a2a, emissiveIntensity:0, roughness:0.3}));
+  led.position.set(-5.3, TOP + 0.02, 0.4);
+  player.add(led);
+  const topText = decal(3.2, 0.5, canvasTex(640, 100, (g) => {
+    g.fillStyle = '#23262a'; g.font = '500 40px "IBM Plex Mono", monospace';
+    g.fillText('OPERATE', 8, 66);
+  }));
+  topText.rotation.x = -Math.PI / 2; topText.position.set(-3.45, TOP + 0.004, 0.4);
+  player.add(topText);
+
+  // ---------- right side: volume wheel ----------
+  const knurl = canvasTex(512, 64, (g, w, h) => {
+    g.fillStyle = '#2a2c2f'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#55595f';
+    for(let x = 0; x < w; x += 16) g.fillRect(x, 0, 7, h);
+  });
+  knurl.wrapS = THREE.RepeatWrapping; knurl.repeat.set(4, 1);
+  const wheelSide = new THREE.MeshStandardMaterial({map:knurl, roughness:0.45, metalness:0.4});
+  const wheel = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.05, 0.42, 64), [wheelSide, graphite, graphite]));
+  wheel.rotation.x = Math.PI / 2;
+  const wheelHolder = new THREE.Group();
+  wheelHolder.position.set(6.0, 1.4, 0);
+  wheelHolder.add(wheel);
+  wheel.userData.act = 'vol';
+  player.add(wheelHolder);
+  const volText = decal(0.45, 2.4, canvasTex(120, 640, (g) => {
+    g.fillStyle = '#23262a'; g.font = '500 30px "IBM Plex Mono", monospace'; g.textAlign = 'center';
+    g.fillText('MAX', 60, 50); g.fillText('MIN', 60, 620);
+    g.beginPath(); g.moveTo(30, 80); g.lineTo(90, 80); g.lineTo(60, 560); g.closePath(); g.fill();
+  }));
+  volText.rotation.y = Math.PI / 2; volText.position.set(6.502, 1.4, 0.95);
+  player.add(volText);
+
+  // ---------- left side: phones jack + hold switch ----------
+  const jackRing = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.07, 12, 32), metal);
+  jackRing.rotation.y = Math.PI / 2; jackRing.position.set(-6.51, 3.2, 0);
+  player.add(jackRing);
+  const jackHole = new THREE.Mesh(new THREE.CircleGeometry(0.24, 24), new THREE.MeshBasicMaterial({color:0x050505}));
+  jackHole.rotation.y = -Math.PI / 2; jackHole.position.set(-6.512, 3.2, 0);
+  player.add(jackHole);
+  const holdSlot = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.5, 1.1), darkMat);
+  holdSlot.position.set(-6.5, 0.8, 0);
+  player.add(holdSlot);
+  const holdKnob = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.38, 0.42), graphite));
+  holdKnob.position.set(-6.55, 0.8, 0.26);
+  player.add(holdKnob);
+  const leftText = decal(2.6, 4.0, canvasTex(520, 800, (g) => {
+    g.fillStyle = '#23262a'; g.font = '500 34px "IBM Plex Mono", monospace'; g.textAlign = 'center';
+    g.fillText('PHONES', 260, 300);
+    g.fillText('HOLD', 260, 545);
+    g.font = '500 24px "IBM Plex Mono", monospace';
+    g.fillText('OFF', 150, 640); g.fillText('ON', 370, 640);
+  }));
+  leftText.rotation.y = -Math.PI / 2; leftText.position.set(-6.502, 1.95, 0);
+  player.add(leftText);
+
+  // ---------- back ----------
+  const backTex = canvasTex(2200, 1500, (g) => {
+    g.strokeStyle = 'rgba(25,27,29,.45)'; g.lineWidth = 7;
+    roundRect(g, 300, 210, 1600, 820, 40); g.stroke();
+    g.strokeStyle = 'rgba(255,255,255,.18)'; g.lineWidth = 3;
+    roundRect(g, 308, 218, 1584, 804, 36); g.stroke();
+    g.strokeStyle = 'rgba(25,27,29,.4)'; g.lineWidth = 8;
+    for(let i = 0; i < 7; i++){ const x = 1720 + i * 22; g.beginPath(); g.moveTo(x, 460); g.lineTo(x, 780); g.stroke(); }
+    g.fillStyle = 'rgba(25,27,29,.6)'; g.font = '500 54px "IBM Plex Mono", monospace';
+    g.fillText('OPEN ▸', 1500, 640);
+    // battery glyphs
+    g.lineWidth = 6; g.strokeStyle = 'rgba(25,27,29,.55)';
+    [[520, 420, 1], [520, 640, -1]].forEach(([x, y, d]) => {
+      roundRect(g, x, y, 640, 130, 20); g.stroke();
+      const nx = d > 0 ? x + 640 : x - 26; g.fillStyle = 'rgba(25,27,29,.55)'; g.fillRect(nx, y + 40, 26, 50);
+      g.font = '500 64px "IBM Plex Mono", monospace';
+      g.fillText(d > 0 ? '−' : '+', x + 30, y + 88); g.fillText(d > 0 ? '+' : '−', x + 570, y + 88);
+    });
+    g.font = '500 44px "IBM Plex Mono", monospace';
+    g.fillText('1.5V × 2  (AA / LR6)', 560, 900);
+    g.fillStyle = 'rgba(25,27,29,.7)'; g.font = '500 38px "IBM Plex Mono", monospace'; g.textAlign = 'center';
+    g.fillText('SORANE ELECTRIC    MODEL SR-28    DC 3V  0.3W', 1100, 1200);
+    g.font = '700 38px "Zen Kaku Gothic New", sans-serif';
+    g.fillText('ポータブル ステレオ カセットプレーヤー', 1100, 1270);
+  }, 0.5);
+  const backDecal = decal(11, 7.5, backTex);
+  backDecal.rotation.y = Math.PI; backDecal.position.set(0, -0.2, -1.502);
+  player.add(backDecal);
+  [[-5.7, 4.0], [5.7, 4.0], [-5.7, -4.0], [5.7, -4.0]].forEach(([x, y]) => {
+    const s = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.05, 20), metal);
+    s.rotation.x = Math.PI / 2; s.position.set(x, y, -1.52); player.add(s);
+  });
+
+  // feet
+  [[-5, -1], [5, -1], [-5, 1], [5, 1]].forEach(([x, z]) => {
+    const f = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.18, 20), darkMat));
+    f.position.set(x, -TOP - 0.08, z); player.add(f);
+  });
+
+  // ---------- camera & controls ----------
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true; controls.dampingFactor = 0.08;
+  controls.enablePan = false;
+  controls.minDistance = 11; controls.maxDistance = 90;
+  controls.autoRotate = !reduceMotion; controls.autoRotateSpeed = 1.1;
+  controls.target.set(0, 0, 0);
+
+  const homeDir = new THREE.Vector3(0.62, 0.36, 1).normalize();
+  function homeDistance(){
+    const a = stage.clientWidth / stage.clientHeight;
+    const vf = THREE.MathUtils.degToRad(32);
+    const hf = 2 * Math.atan(Math.tan(vf / 2) * a);
+    return Math.max(7.2 / Math.tan(vf / 2), 8.2 / Math.tan(hf / 2)) + 3;
+  }
+  camera.position.copy(homeDir).multiplyScalar(homeDistance());
+  controls.update();
+
+  let camTween = null, playerMode = false;
+  const camTarget = new THREE.Vector3();
+  function homeView(){
+    return {pos:homeDir.clone().multiplyScalar(homeDistance()), up:new THREE.Vector3(0, 1, 0), fov:32, target:new THREE.Vector3()};
+  }
+  function tweenTo(v, done){
+    camTween = {
+      p0:camera.position.clone(), p1:v.pos,
+      u0:camera.up.clone(), u1:v.up,
+      f0:camera.fov, f1:v.fov,
+      t0:camTarget.clone(), t1:v.target,
+      t:0, done
+    };
+  }
+  function applyView(v){
+    camera.position.copy(v.pos); camera.up.copy(v.up);
+    camera.fov = v.fov; camera.updateProjectionMatrix();
+    camTarget.copy(v.target); camera.lookAt(camTarget);
+  }
+  function resetView(){ if(!playerMode) tweenTo(homeView()); }
+
+  // ---------- audio: tape deck, tape character, mechanical sounds ----------
+  let ac = null, noiseBuf = null, bus = null;
+  const tape = {tracks:[], total:90, title:'秋の帰り道 mix', sub:'2026.10  for the walk home', color:'#e2553b', cType:'C-46', ready:false};
+  let demoBuf = null, demoResolve;
+  const demoReady = new Promise(r => { demoResolve = r; });
+  const deck = {src:null, gain:null, startTime:0, startPos:0};
+  const LEADER = 1.2, GAP = 1.8, TAIL = 2.5;
+
+  function ensureAudio(){
+    try{
+      if(!ac){
+        try{ if(navigator.audioSession) navigator.audioSession.type = 'playback'; }catch(e){}
+        ac = new (window.AudioContext || window.webkitAudioContext)();
+        noiseBuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
+        const d = noiseBuf.getChannelData(0); for(let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+        buildBus();
+        renderDemo();
+      }
+      if(ac.state !== 'running') ac.resume();
+    }catch(e){ ac = null; }
+  }
+
+  function buildBus(){
+    bus = {};
+    bus.music = ac.createGain();
+    // wow & flutter: a short delay line whose time wobbles slowly and quickly
+    const wow = ac.createDelay(0.05); wow.delayTime.value = 0.012;
+    [[0.55, 0.0009], [6.3, 0.00016]].forEach(([f, depth]) => {
+      const o = ac.createOscillator(); o.frequency.value = f;
+      const g = ac.createGain(); g.gain.value = depth;
+      o.connect(g).connect(wow.delayTime); o.start();
+    });
+    const low = ac.createBiquadFilter(); low.type = 'lowshelf'; low.frequency.value = 140; low.gain.value = 2.5;
+    const top = ac.createBiquadFilter(); top.type = 'lowpass'; top.frequency.value = 10500; top.Q.value = 0.4;
+    const sat = ac.createWaveShaper();
+    const curve = new Float32Array(1024);
+    for(let i = 0; i < 1024; i++){ const x = i / 511.5 - 1; curve[i] = Math.tanh(1.5 * x) / Math.tanh(1.5); }
+    sat.curve = curve;
+    bus.vol = ac.createGain(); bus.vol.gain.value = volGain();
+    bus.music.connect(wow).connect(low).connect(top).connect(sat).connect(bus.vol).connect(ac.destination);
+    // tape hiss (follows the volume wheel)
+    const hs = ac.createBufferSource(); hs.buffer = noiseBuf; hs.loop = true;
+    const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 3500;
+    bus.hiss = ac.createGain(); bus.hiss.gain.value = 0;
+    hs.connect(hp).connect(bus.hiss).connect(bus.vol); hs.start();
+    // capstan motor hum
+    const mo = ac.createOscillator(); mo.frequency.value = 96;
+    const mlp = ac.createBiquadFilter(); mlp.type = 'lowpass'; mlp.frequency.value = 300;
+    bus.motor = ac.createGain(); bus.motor.gain.value = 0;
+    mo.connect(mlp).connect(bus.motor).connect(ac.destination); mo.start();
+    // fast-wind whine + rattle
+    bus.windOsc = ac.createOscillator(); bus.windOsc.type = 'sawtooth'; bus.windOsc.frequency.value = 240;
+    const wlp = ac.createBiquadFilter(); wlp.type = 'lowpass'; wlp.frequency.value = 900;
+    bus.wind = ac.createGain(); bus.wind.gain.value = 0;
+    bus.windOsc.connect(wlp).connect(bus.wind).connect(ac.destination); bus.windOsc.start();
+    const rs = ac.createBufferSource(); rs.buffer = noiseBuf; rs.loop = true;
+    const rbp = ac.createBiquadFilter(); rbp.type = 'bandpass'; rbp.frequency.value = 2400; rbp.Q.value = 1.5;
+    bus.rattle = ac.createGain(); bus.rattle.gain.value = 0;
+    rs.connect(rbp).connect(bus.rattle).connect(ac.destination); rs.start();
+    bus.sfx = ac.createGain(); bus.sfx.gain.value = 0.9; bus.sfx.connect(ac.destination);
+  }
+  const volGain = () => Math.pow(state.vol / 10, 1.6);
+
+  // ----- mechanical sound effects -----
+  function burst(t, freq, q, level, dur){
+    const s = ac.createBufferSource(); s.buffer = noiseBuf;
+    const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = q;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(level, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(f).connect(g).connect(bus.sfx);
+    s.start(t, Math.random() * 1.5); s.stop(t + dur + 0.02);
+  }
+  function thump(t, f0, f1, level, dur){
+    const o = ac.createOscillator(); o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    const g = ac.createGain(); g.gain.setValueAtTime(level, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(bus.sfx); o.start(t); o.stop(t + dur + 0.02);
+  }
+  function ring(t, f, level, dur){
+    const o = ac.createOscillator(); o.frequency.value = f;
+    const g = ac.createGain(); g.gain.setValueAtTime(level, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(bus.sfx); o.start(t); o.stop(t + dur + 0.02);
+  }
+  function swish(t, f0, f1, dur, level){
+    const s = ac.createBufferSource(); s.buffer = noiseBuf;
+    const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 1.1;
+    f.frequency.setValueAtTime(f0, t); f.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(level, t + dur * 0.35); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(f).connect(g).connect(bus.sfx); s.start(t, Math.random()); s.stop(t + dur + 0.02);
+  }
+  function sfx(type){
+    if(!ac || !bus) return;
+    const t = ac.currentTime + 0.005;
+    if(type === 'key'){
+      burst(t, 3200, 1.2, 0.5, 0.02); thump(t, 150, 55, 0.45, 0.07);
+      burst(t + 0.035, 1900, 2, 0.35, 0.025);
+    } else if(type === 'stop'){
+      burst(t, 2600, 1.2, 0.55, 0.025); thump(t, 130, 45, 0.55, 0.09);
+      burst(t + 0.06, 3600, 2.5, 0.4, 0.02); ring(t + 0.06, 1180, 0.04, 0.12);
+    } else if(type === 'open'){
+      burst(t, 2200, 2, 0.6, 0.02); thump(t, 110, 50, 0.4, 0.08);
+      burst(t + 0.02, 850, 9, 0.5, 0.28); ring(t + 0.02, 430, 0.06, 0.35); ring(t + 0.02, 1290, 0.025, 0.2);
+    } else if(type === 'close'){
+      burst(t, 1500, 2, 0.4, 0.02); burst(t + 0.03, 3000, 2, 0.6, 0.02); thump(t + 0.03, 120, 45, 0.5, 0.08);
+    } else if(type === 'tick'){
+      burst(t, 4500, 3, 0.18, 0.012);
+    } else if(type === 'insert'){
+      // "スチャッ": a quick plastic swish, then the snap of the cassette seating
+      swish(t, 2200, 5200, 0.09, 0.45);
+      burst(t + 0.085, 3300, 1.4, 0.75, 0.018); thump(t + 0.085, 170, 50, 0.6, 0.07);
+      burst(t + 0.11, 1700, 3, 0.35, 0.03);
+    } else if(type === 'eject'){
+      burst(t, 1900, 2, 0.5, 0.02); thump(t, 120, 50, 0.5, 0.09);
+      burst(t + 0.015, 1100, 6, 0.32, 0.22); ring(t + 0.015, 520, 0.045, 0.25);
+    } else if(type === 'slide'){
+      swish(t, 1700, 3200, 0.26, 0.2);
+    } else if(type === 'rackIn'){
+      burst(t, 1300, 1.5, 0.35, 0.03); thump(t, 100, 45, 0.35, 0.07); burst(t + 0.03, 2600, 2, 0.2, 0.02);
+    }
+  }
+
+  // ----- tape bed: hiss, motor and wind follow the transport -----
+  function setBed(){
+    if(!ac || !bus) return;
+    const t = ac.currentTime, m = state.mode;
+    bus.vol.gain.setTargetAtTime(volGain(), t, 0.05);
+    bus.hiss.gain.setTargetAtTime(m === 'play' ? 0.0035 : 0, t, 0.06);
+    bus.motor.gain.setTargetAtTime(m === 'stop' ? 0 : m === 'play' ? 0.005 : 0.016, t, 0.06);
+    const winding = m === 'ff' || m === 'rew';
+    bus.wind.gain.setTargetAtTime(winding ? 0.03 : 0, t, winding ? 0.15 : 0.05);
+    bus.rattle.gain.setTargetAtTime(winding ? 0.035 : 0, t, 0.1);
+    if(winding){ bus.windOsc.frequency.cancelScheduledValues(t); bus.windOsc.frequency.setValueAtTime(150, t); bus.windOsc.frequency.linearRampToValueAtTime(320, t + 0.6); }
+  }
+
+  // ----- the tape itself: tracks are decoded one at a time, so long tapes stay light -----
+  const cTypeOf = m => m <= 46 ? 'C-46' : m <= 60 ? 'C-60' : m <= 90 ? 'C-90' : 'C-120';
+  function setTape(rec){
+    tape.tracks.forEach(t => { if(!t.keep) t.buf = null; });
+    const src = rec.demo
+      ? (demoBuf ? [{name:'秋の帰り道', dur:demoBuf.duration, buf:demoBuf, keep:true}] : [])
+      : (rec.files || []).filter(f => f.dur > 0).map(f => ({name:f.name, dur:f.dur, blob:f.blob}));
+    let pos = LEADER;
+    tape.tracks = src.map(tr => {
+      const start = pos, end = start + tr.dur;
+      pos = end + GAP;
+      return Object.assign({start, end, buf:null, loading:null}, tr);
+    });
+    const last = tape.tracks[tape.tracks.length - 1];
+    tape.total = last ? last.end + TAIL : 90;
+    tape.title = rec.title; tape.sub = rec.sub; tape.color = rec.color;
+    tape.cType = cTypeOf(tape.total / 60); tape.ready = tape.tracks.length > 0;
+    relabel();
+  }
+  function trackAt(pos){
+    for(let i = 0; i < tape.tracks.length; i++) if(tape.tracks[i].end > pos + 0.01) return i;
+    return -1;
+  }
+  function getBuf(i){
+    const tr = tape.tracks[i]; if(!tr) return Promise.resolve(null);
+    if(tr.buf) return Promise.resolve(tr.buf);
+    if(!tr.loading){
+      const list = tape.tracks;
+      tr.loading = decode(tr.blob).then(b => {
+        tr.loading = null;
+        if(tape.tracks !== list) return null;
+        tr.buf = b;
+        list.forEach((t, j) => { if(!t.keep && j !== i && j !== i + 1 && j !== deck.track) t.buf = null; });
+        return b;
+      }).catch(() => { tr.loading = null; return null; });
+    }
+    return tr.loading;
+  }
+  let deckToken = 0;
+  function startDeck(){
+    if(!ac || !bus || !tape.ready) return;
+    stopDeck(false);
+    const token = ++deckToken;
+    deck.startTime = ac.currentTime + 0.02; deck.startPos = state.pos;
+    const i = trackAt(state.pos); if(i < 0) return;
+    const tr = tape.tracks[i];
+    deck.track = i;
+    if(tr.buf){ playTrack(i); return; }
+    deck.loading = true;
+    getBuf(i).then(buf => {
+      if(token !== deckToken || state.mode !== 'play') return;
+      deck.loading = false;
+      deck.startTime = ac.currentTime + 0.02; deck.startPos = state.pos;
+      if(buf) playTrack(i);
+      else { state.pos = tr.end; startDeck(); }
+    });
+  }
+  function playTrack(i){
+    const tr = tape.tracks[i];
+    const delay = Math.max(0, tr.start - state.pos), offset = Math.max(0, state.pos - tr.start);
+    if(offset >= tr.buf.duration - 0.05){
+      if(i + 1 < tape.tracks.length){ state.pos = tr.end; startDeck(); }
+      return;
+    }
+    const g = ac.createGain(); g.connect(bus.music);
+    const s = ac.createBufferSource(); s.buffer = tr.buf; s.connect(g);
+    const t = deck.startTime + delay;
+    if(delay === 0){
+      s.playbackRate.setValueAtTime(0.8, t); s.playbackRate.linearRampToValueAtTime(1, t + 0.22);
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(1, t + 0.06);
+    }
+    s.start(t, offset);
+    s.onended = () => {
+      if(deck.src !== s) return;
+      deck.src = null;
+      if(state.mode === 'play' && i + 1 < tape.tracks.length){ state.pos = Math.max(state.pos, tr.end); startDeck(); }
+    };
+    deck.src = s; deck.gain = g;
+    if(i + 1 < tape.tracks.length) getBuf(i + 1);
+  }
+  function stopDeck(slow){
+    deckToken++; deck.loading = false;
+    const s = deck.src, g = deck.gain; deck.src = null;
+    if(!s || !ac) return;
+    const t = ac.currentTime;
+    try{
+      if(slow){
+        s.playbackRate.cancelScheduledValues(t); s.playbackRate.setValueAtTime(s.playbackRate.value, t);
+        s.playbackRate.linearRampToValueAtTime(0.45, t + 0.18);
+        g.gain.setTargetAtTime(0, t + 0.04, 0.05);
+        s.stop(t + 0.3);
+      } else s.stop();
+    }catch(e){}
+  }
+
+  // ----- the demo tape: an original lo-fi loop, rendered offline on first tap -----
+  function renderDemo(){
+    try{
+      const sr = 32000, dur = 74;
+      const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+      const oc = new OAC(1, sr * dur, sr);
+      const nb = oc.createBuffer(1, sr, sr); const nd = nb.getChannelData(0);
+      for(let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+      const out = oc.createGain(); out.gain.value = 0.55;
+      out.gain.setValueAtTime(0.55, dur - 4); out.gain.linearRampToValueAtTime(0, dur - 0.3);
+      out.connect(oc.destination);
+      const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+      const pan = v => { const p = oc.createStereoPanner ? oc.createStereoPanner() : oc.createGain(); if(p.pan) p.pan.value = v; p.connect(out); return p; };
+      const keysBus = pan(-0.15), leadBus = pan(0.2), drumBus = pan(0);
+      function tone(dest, t, f, d, type, lvl, atk = 0.01){
+        const o = oc.createOscillator(); o.type = type; o.frequency.value = f;
+        const g = oc.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(lvl, t + atk);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+        o.connect(g).connect(dest); o.start(t); o.stop(t + d + 0.05);
+      }
+      function noise(dest, t, d, type, f, q, lvl){
+        const s = oc.createBufferSource(); s.buffer = nb;
+        const fl = oc.createBiquadFilter(); fl.type = type; fl.frequency.value = f; fl.Q.value = q;
+        const g = oc.createGain(); g.gain.setValueAtTime(lvl, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+        s.connect(fl).connect(g).connect(dest); s.start(t, Math.random() * 0.5); s.stop(t + d + 0.05);
+      }
+      const bpm = 82, beat = 60 / bpm, bar = beat * 4;
+      const chords = [[53, 57, 60, 64], [52, 55, 59, 62], [50, 53, 57, 60, 64], [48, 52, 55, 59]];
+      const roots = [41, 40, 38, 36];
+      const scale = [72, 74, 76, 79, 81, 84];
+      let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+      const bars = Math.floor((dur - 3) / bar);
+      for(let b = 0; b < bars; b++){
+        const t0 = 0.4 + b * bar, c = chords[b % 4], r = roots[b % 4];
+        c.forEach(m => {
+          [0, beat * 2.5].forEach(off => {
+            tone(keysBus, t0 + off, mtof(m), 2.2, 'sine', 0.05, 0.02);
+            tone(keysBus, t0 + off, mtof(m + 12), 0.9, 'triangle', 0.012, 0.005);
+          });
+        });
+        if(b >= 2){
+          tone(out, t0, mtof(r), beat * 1.6, 'sine', 0.22, 0.01);
+          tone(out, t0 + beat * 2.5, mtof(r + 7), beat * 1.2, 'sine', 0.16, 0.01);
+          [0, beat * 1.5, beat * 2.75].forEach(off => {
+            const t = t0 + off, o = oc.createOscillator(), g = oc.createGain();
+            o.frequency.setValueAtTime(130, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.14);
+            g.gain.setValueAtTime(0.55, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+            o.connect(g).connect(drumBus); o.start(t); o.stop(t + 0.25);
+          });
+          [beat, beat * 3].forEach(off => { noise(drumBus, t0 + off, 0.16, 'bandpass', 1900, 0.9, 0.22); tone(drumBus, t0 + off, 190, 0.08, 'triangle', 0.08); });
+          for(let e = 0; e < 8; e++){
+            const sw = e % 2 ? beat * 0.12 : 0;
+            noise(drumBus, t0 + e * beat / 2 + sw, 0.045, 'highpass', 7500, 0.7, e % 2 ? 0.05 : 0.08);
+          }
+        }
+        if(b >= 4 && b < bars - 1){
+          for(let e = 0; e < 8; e++){
+            if(rnd() < 0.42){
+              const m = scale[Math.floor(rnd() * scale.length)];
+              const t = t0 + e * beat / 2 + (e % 2 ? beat * 0.1 : 0);
+              tone(leadBus, t, mtof(m), 0.55, 'triangle', 0.07, 0.008);
+              tone(leadBus, t, mtof(m), 0.4, 'sine', 0.05, 0.008);
+            }
+          }
+        }
+      }
+      const done = buf => {
+        demoBuf = buf; demoResolve();
+        if(current.demo && !tape.ready){ setTape(demoRec); if(state.mode === 'play') startDeck(); }
+      };
+      const pr = oc.startRendering();
+      if(pr && pr.then) pr.then(done).catch(() => demoResolve()); else oc.oncomplete = e => done(e.renderedBuffer);
+    }catch(e){ demoResolve(); }
+  }
+
+  // ---------- state & actions ----------
+  const state = {mode:'stop', door:0, doorTarget:0, pos:0, vol:6};
+  const ui = {play:$('#bPlay'), door:$('#bDoor'), auto:$('#bAuto'), mode:$('#mode'), ctr:$('#ctr'), dot:$('#dot'), hint:$('#hint'), tape:$('#tapeName')};
+  const atEnd = () => state.pos >= tape.total - 0.05;
+  function say(text){ ui.hint.textContent = text; if(playerMode) flashHint(text); }
+
+  function setMode(m){
+    const prev = state.mode;
+    if(prev === 'play' && m !== 'play') stopDeck(true);
+    state.mode = m;
+    if(m === 'play') startDeck();
+    keys.play.target = (m === 'play') ? 1 : 0;
+    syncUI(); setBed();
+  }
+  function syncUI(){
+    const label = state.doorTarget ? 'OPEN' : state.mode === 'play' ? 'PLAY' : state.mode === 'ff' ? 'FF  ▸▸' : state.mode === 'rew' ? 'REW ◂◂' : (atEnd() ? 'END' : 'STOP');
+    ui.mode.textContent = label;
+    ui.dot.classList.toggle('on', state.mode !== 'stop');
+    ui.play.innerHTML = state.mode === 'play' ? '<span class="mono">■</span>停止' : '<span class="mono">▶</span>再生';
+    ui.door.textContent = state.doorTarget ? 'フタを閉じる' : 'フタを開ける';
+  }
+  function setDoor(open){
+    if(!!state.doorTarget === open) return;
+    if(open && state.mode !== 'stop') setMode('stop');
+    state.doorTarget = open ? 1 : 0;
+    sfx(open ? 'open' : 'close');
+    syncUI();
+  }
+  function press(id){
+    ensureAudio();
+    if(busy || rackMode) return;
+    const k = keys[id];
+    if(k){ k.flash = 0.18; sfx(id === 'stop' ? 'stop' : 'key'); }
+    if(id === 'play'){
+      if(state.mode === 'play'){ setMode('stop'); return; }
+      if(atEnd()){ say('テープの終わりです。◂◂ で巻き戻してから再生してください。'); syncUI(); return; }
+      if(state.doorTarget) setDoor(false);
+      setMode('play');
+    } else if(id === 'stop'){
+      if(state.mode !== 'stop') setMode('stop');
+      else if(state.doorTarget) ejectToRack();
+      else setDoor(true);
+    } else if(id === 'ff' || id === 'rew'){
+      if(state.mode === id){ setMode('stop'); return; }
+      if(state.doorTarget) setDoor(false);
+      setMode(id);
+    } else if(id === 'door'){
+      setDoor(!state.doorTarget);
+    } else if(id === 'cassette'){
+      if(state.doorTarget) ejectToRack();
+      else setDoor(true);
+    } else if(id === 'vol'){
+      state.vol = state.vol % 10 + 1;
+      state.wheelTarget = (state.wheelTarget || 0) - 0.6;
+      sfx('tick');
+      setBed();
+    }
+  }
+
+  ui.play.addEventListener('click', () => press('play'));
+  ui.door.addEventListener('click', () => { ensureAudio(); press('door'); });
+  ui.auto.addEventListener('click', () => {
+    controls.autoRotate = !controls.autoRotate;
+    ui.auto.setAttribute('aria-pressed', String(controls.autoRotate));
+  });
+  $('#bReset').addEventListener('click', resetView);
+
+  // ---------- player mode: the phone screen becomes the face of the player ----------
+  const pmScene = new THREE.Scene();
+  pmScene.environment = scene.environment;
+  pmScene.add(new THREE.HemisphereLight(0xfff4e6, 0x1a1a1a, scene.environment ? 0.18 : 0.6));
+  const pmSun = new THREE.DirectionalLight(0xfff1e0, 1.15);
+  pmSun.castShadow = true; pmSun.shadow.mapSize.set(1024, 1024);
+  pmSun.shadow.bias = -0.0005; pmSun.shadow.normalBias = 0.02; pmSun.shadow.radius = 5;
+  pmScene.add(pmSun, pmSun.target);
+  const pmFill = new THREE.DirectionalLight(0x9fc4ff, 0.35);
+  pmFill.position.set(20, -12, 25); pmScene.add(pmFill);
+  const pmCam = new THREE.PerspectiveCamera(30, 1, 0.5, 400);
+  const stripMat = new THREE.MeshStandardMaterial({color:0xc8cdbf, roughness:0.5});
+  stripMat.envMapIntensity = 0.55;
+  // material colours are authored in sRGB; convert once so they render as picked
+  [bodyMat, graphite, darkMat, metal, darkPlastic, tapeMat, hubMat, glassMat, keyLight, keyCoral, stripMat].forEach(m => m.color.convertSRGBToLinear());
+  led.material.color.convertSRGBToLinear(); led.material.emissive.convertSRGBToLinear();
+
+  const autoTex = canvasTex(1200, 110, g => {
+    g.fillStyle = 'rgba(35,38,42,.7)'; g.font = '500 38px "IBM Plex Mono", monospace'; g.textAlign = 'center';
+    g.fillText('AUTO STOP  ·  NORMAL / HIGH POSITION', 600, 70);
+  });
+  const volTexV = canvasTex(120, 560, g => {
+    g.fillStyle = '#23262a'; g.font = '500 28px "IBM Plex Mono", monospace'; g.textAlign = 'center';
+    g.fillText('VOL', 60, 40);
+    g.beginPath(); g.moveTo(34, 80); g.lineTo(86, 80); g.lineTo(60, 520); g.closePath(); g.fill();
+  });
+  const volTexH = canvasTex(560, 120, g => {
+    g.fillStyle = '#23262a'; g.font = '500 28px "IBM Plex Mono", monospace';
+    g.fillText('VOL', 8, 70);
+    g.beginPath(); g.moveTo(90, 60); g.lineTo(540, 34); g.lineTo(540, 86); g.closePath(); g.fill();
+  });
+  const ctrCanvas = document.createElement('canvas'); ctrCanvas.width = 640; ctrCanvas.height = 160;
+  const ctrTex = new THREE.CanvasTexture(ctrCanvas); ctrTex.encoding = THREE.sRGBEncoding; ctrTex.anisotropy = aniso;
+  let ctrShown = -1;
+  const topLabelTex = canvasTex(1280, 100, g => {
+    g.fillStyle = '#23262a'; g.font = '500 34px "IBM Plex Mono", monospace'; g.textAlign = 'center';
+    g.fillText('PHONES', 220, 64); g.fillText('HOLD  ◂ ON · OFF ▸', 1020, 64);
+  });
+  function drawCounter(n){
+    const g = ctrCanvas.getContext('2d');
+    g.clearRect(0, 0, 640, 160);
+    g.fillStyle = '#23262a'; g.font = '500 30px "IBM Plex Mono", monospace';
+    g.fillText('COUNTER', 6, 92);
+    const s = String(n).padStart(3, '0');
+    for(let i = 0; i < 3; i++){
+      const x = 236 + i * 128;
+      roundRect(g, x, 18, 112, 124, 12); g.fillStyle = '#1b1c1e'; g.fill();
+      g.fillStyle = 'rgba(255,255,255,.06)'; g.fillRect(x + 6, 78, 100, 2);
+      g.fillStyle = '#ece7dc'; g.font = '500 86px "IBM Plex Mono", monospace'; g.textAlign = 'center';
+      g.fillText(s[i], x + 56, 112); g.textAlign = 'left';
+    }
+    ctrTex.needsUpdate = true;
+  }
+  drawCounter(0);
+
+  let pm = null;
+  function buildPM(){
+    if(pm){
+      pmScene.remove(pm.root);
+      pm.root.traverse(o => {
+        if(o.geometry) o.geometry.dispose();
+        if(o.material && !Array.isArray(o.material) && o.material.userData.disposable) o.material.dispose();
+      });
+    }
+    const W = stage.clientWidth, H = stage.clientHeight, portrait = H >= W;
+    const fw = portrait ? 12 : 12 * W / H, fh = portrait ? 12 * H / W : 12;
+    const OV = 8, sw = 3.0;
+    const root = new THREE.Group(); pmScene.add(root);
+    const P = {root, portrait, fw, fh, keys:{}, picks:[]};
+
+    // where everything sits
+    let bay, slot, strip, keyList, brandAt, ctrAt, autoAt, ledAt, volAt, cx0 = 0;
+    if(portrait){
+      const cx = -sw / 2 + 0.45; cx0 = cx;
+      const cy = Math.min(0.4, fh / 2 - 3.4 - 5.35);
+      bay = {x:cx, y:cy, w:6.8, h:10.7};
+      strip = {x:fw / 2 - sw + (sw + OV) / 2, y:0, w:sw + OV, h:fh + 2 * OV};
+      const ids = ['play', 'ff', 'rew', 'stop'], hs = [3.0, 2.3, 2.3, 2.3], gap = 0.5;
+      const total = hs.reduce((a, b) => a + b, 0) + gap * 3;
+      let y = cy + total / 2;
+      keyList = ids.map((id, i) => { const k = {id, x:fw / 2 - sw / 2, y:y - hs[i] / 2, w:2.2, h:hs[i]}; y -= hs[i] + gap; return k; });
+      slot = {x:-fw / 2 + 0.62, y:cy - 2.6, w:0.82, h:3.8, axis:'x'};
+      volAt = {x:slot.x, y:slot.y + 3.35, w:0.42, h:1.95, tex:volTexV};
+      brandAt = {x:cx, y:bay.y + bay.h / 2 + 1.55, w:7.6};
+      ctrAt = {x:cx - 0.7, y:bay.y - bay.h / 2 - 1.45, w:3.8};
+      ledAt = {x:cx + 2.4, y:ctrAt.y};
+      autoAt = {x:cx, y:bay.y - bay.h / 2 - 2.65, w:7.6};
+    } else {
+      const cy = -sw / 2;
+      const bx = -fw / 2 + 1.3 + 5.35;
+      bay = {x:bx, y:cy, w:10.7, h:6.8};
+      strip = {x:0, y:fh / 2 - sw + (sw + OV) / 2, w:fw + 2 * OV, h:sw + OV};
+      const ids = ['stop', 'rew', 'play', 'ff'], ws = [2.3, 2.3, 3.0, 2.3], gap = 0.5;
+      const total = ws.reduce((a, b) => a + b, 0) + gap * 3;
+      let x = bx - total / 2;
+      keyList = ids.map((id, i) => { const k = {id, x:x + ws[i] / 2, y:fh / 2 - sw / 2, w:ws[i], h:2.2}; x += ws[i] + gap; return k; });
+      const rx = bx + bay.w / 2 + 0.9, rw = fw / 2 - 0.9 - rx, rc = rx + rw / 2;
+      brandAt = {x:rc, y:cy + 2.3, w:Math.min(8.2, rw)};
+      ctrAt = {x:rc - 0.7, y:cy + 0.4, w:3.8};
+      ledAt = {x:rc + 1.9, y:ctrAt.y};
+      autoAt = {x:rc, y:cy - 0.9, w:Math.min(7.6, rw)};
+      slot = {x:rc + 0.6, y:-fh / 2 + 0.62, w:3.8, h:0.82, axis:'y'};
+      volAt = {x:slot.x - 3.3, y:slot.y, w:1.95, h:0.42, tex:volTexH};
+    }
+
+    // face: the whole screen is the body, with a recessed bay and a wheel slot
+    const face = shadowy(new THREE.Mesh(slab(fw + 2 * OV, fh + 2 * OV, 0.6, 1.4, 0.14, [
+      {w:bay.w, h:bay.h, r:0.45, x:bay.x, y:bay.y},
+      {w:slot.w, h:slot.h, r:0.3, x:slot.x, y:slot.y}
+    ]), bodyMat));
+    face.position.z = -1.4; root.add(face);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(fw + 2 * OV, fh + 2 * OV), darkMat);
+    floor.position.z = -1.38; floor.receiveShadow = true; root.add(floor);
+
+    // the top face, folded onto the front as a raised strip
+    const st = shadowy(new THREE.Mesh(slab(strip.w, strip.h, 0.5, 0.45, 0.2), stripMat));
+    st.position.set(strip.x, strip.y, 0); root.add(st);
+    const kx0 = Math.min(...keyList.map(k => k.x - k.w / 2)), kx1 = Math.max(...keyList.map(k => k.x + k.w / 2));
+    const ky0 = Math.min(...keyList.map(k => k.y - k.h / 2)), ky1 = Math.max(...keyList.map(k => k.y + k.h / 2));
+    const well = new THREE.Mesh(new THREE.ShapeGeometry(rrShape(kx1 - kx0 + 0.5, ky1 - ky0 + 0.5, 0.5), 12), darkMat);
+    well.position.set((kx0 + kx1) / 2, (ky0 + ky1) / 2, 0.453); well.receiveShadow = true; root.add(well);
+
+    const keyMats = {play:keyCoral, ff:keyLight, rew:keyLight, stop:graphite};
+    const iconCol = {play:'#fbf4ea', ff:'#2a2c2f', rew:'#2a2c2f', stop:'#ece7dc'};
+    keyList.forEach(k => {
+      const m = shadowy(new THREE.Mesh(slab(k.w, k.h, 0.38, 0.75, 0.16), keyMats[k.id]));
+      m.position.set(k.x, k.y, 0.2); m.userData.act = k.id;
+      const s = Math.min(k.w, k.h) * 0.52;
+      const ic = decal(s, s, iconTex(k.id, iconCol[k.id]), {rough:0.5});
+      ic.position.z = 0.752; ic.userData.act = k.id; m.add(ic);
+      root.add(m); P.keys[k.id] = m; P.picks.push(m, ic);
+    });
+
+    // cassette in the bay
+
+    // door, hinged on its bottom edge
+    // door is built like the real one (hinge on the cassette's bottom edge), then turned with the cassette
+    const dl = Math.max(bay.w, bay.h) + 0.5, ds = Math.min(bay.w, bay.h) + 0.5;
+    const hold = new THREE.Group(); hold.position.set(bay.x, bay.y, 0);
+    if(portrait) hold.rotation.z = -Math.PI / 2;
+    root.add(hold);
+    const pivot = new THREE.Group(); pivot.position.y = -ds / 2; hold.add(pivot);
+    // the cassette sits in the door's holder, so it tilts out with the door and leaves through its free edge
+    const cas = buildCassette(pivot);
+    cas.group.position.set(0, ds / 2, -1.3);
+    P.cas = cas; P.casY = ds / 2;
+    cas.shell.userData.act = 'cassette'; P.picks.push(cas.shell);
+    const win = {w:7.5, h:2.7, r:0.3, x:0, y:0.16};
+    const dmesh = shadowy(new THREE.Mesh(slab(dl, ds, 0.5, 0.24, 0.07, [win]), graphite));
+    dmesh.position.y = ds / 2; pivot.add(dmesh);
+    const gl = new THREE.Mesh(new THREE.PlaneGeometry(win.w + 0.2, win.h + 0.2), glassMat);
+    gl.position.set(win.x, ds / 2 + win.y, 0.12); pivot.add(gl);
+    for(let i = 0; i < 5; i++){
+      const r = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.06, 0.05), metal);
+      r.position.set(0, ds - 0.55 - i * 0.13, 0.265); pivot.add(r);
+    }
+    const hg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, dl - 0.4, 16), metal);
+    hg.rotation.z = Math.PI / 2; hg.position.z = 0.06; pivot.add(hg);
+    [dmesh, gl].forEach(m => { m.userData.act = 'door'; P.picks.push(m); });
+    P.door = pivot;
+
+    // thumb wheel rolling in its slot
+    const wg = new THREE.Group(); wg.position.set(slot.x, slot.y, -1.05); root.add(wg);
+    const wm = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, slot.axis === 'x' ? slot.w - 0.2 : slot.h - 0.2, 64), [wheelSide, graphite, graphite]));
+    if(slot.axis === 'x') wm.rotation.z = Math.PI / 2;
+    wm.userData.act = 'vol'; wg.add(wm); P.picks.push(wm);
+    P.wheel = wg; P.wheelAxis = slot.axis;
+    const vl = decal(volAt.w, volAt.h, volAt.tex); vl.position.set(volAt.x, volAt.y, 0.003); root.add(vl);
+
+    // print on the face
+    const br = decal(brandAt.w, brandAt.w * 1.7 / 12, brandTex); br.position.set(brandAt.x, brandAt.y, 0.003); root.add(br);
+    const ct = decal(ctrAt.w, ctrAt.w / 4, ctrTex); ct.position.set(ctrAt.x, ctrAt.y, 0.003); root.add(ct);
+    const au = decal(autoAt.w, autoAt.w * 110 / 1200, autoTex); au.position.set(autoAt.x, autoAt.y, 0.003); root.add(au);
+    const ld = new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 12), led.material);
+    ld.position.set(ledAt.x, ledAt.y, 0.02); root.add(ld);
+
+    // phones jack + hold switch up top, where the face has room
+    if(portrait && fh / 2 - (brandAt.y + 1.2) > 2.2){
+      const ty = brandAt.y + 2.6;
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.09, 12, 32), metal);
+      ring.position.set(cx0 - 2.6, ty, 0.02); root.add(ring);
+      const holeMat = new THREE.MeshBasicMaterial({color:0x050505}); holeMat.userData.disposable = true;
+      const hole = new THREE.Mesh(new THREE.CircleGeometry(0.3, 28), holeMat);
+      hole.position.set(cx0 - 2.6, ty, 0.012); root.add(hole);
+      const hs = new THREE.Mesh(new THREE.ShapeGeometry(rrShape(1.5, 0.42, 0.21), 8), darkMat);
+      hs.position.set(cx0 + 1.6, ty, 0.006); root.add(hs);
+      const hk = shadowy(new THREE.Mesh(slab(0.62, 0.5, 0.14, 0.28, 0.07), graphite));
+      hk.position.set(cx0 + 1.2, ty, 0); root.add(hk);
+      const lab = decal(6.4, 0.5, topLabelTex); lab.position.set(cx0 - 0.5, ty - 0.75, 0.003); root.add(lab);
+    }
+
+    // light + camera fitted so the face plane fills the screen exactly
+    const m = Math.max(fw, fh) / 2 + 3;
+    pmSun.position.set(-fw * 0.45, fh * 0.42, 40);
+    Object.assign(pmSun.shadow.camera, {left:-m, right:m, top:m, bottom:-m, near:5, far:100});
+    pmSun.shadow.camera.updateProjectionMatrix();
+    pmCam.aspect = W / H; pmCam.fov = 30; pmCam.updateProjectionMatrix();
+    P.dist = (fh / 2) / Math.tan(THREE.MathUtils.degToRad(15));
+    pm = P;
+  }
+
+  let wakeLock = null, hintTimer = 0, appear = 1;
+  const par = {x:0, y:0, tx:0, ty:0};
+  const bExit = $('#bExit'), pHint = $('#pHint');
+  function flashHint(text){
+    pHint.textContent = text; pHint.classList.remove('fade');
+    clearTimeout(hintTimer); hintTimer = setTimeout(() => pHint.classList.add('fade'), 4200);
+  }
+  function enterPlayer(){
+    if(playerMode) return;
+    playerMode = true;
+    ensureAudio();
+    buildPM();
+    appear = reduceMotion ? 1 : 0;
+    document.body.classList.add('player');
+    bExit.hidden = false;
+    controls.enabled = false;
+    controls.autoRotate = false; ui.auto.setAttribute('aria-pressed', 'false');
+    flashHint((pm.portrait ? '▶ で再生。左のホイールを上下に転がすと音量。' : '▶ で再生。下のホイールを左右に転がすと音量。') + 'フタを開けてカセットをタップするとテープラックへ。');
+    try{ const r = document.documentElement.requestFullscreen && document.documentElement.requestFullscreen(); if(r && r.catch) r.catch(() => {}); }catch(e){}
+    try{ if(navigator.wakeLock) navigator.wakeLock.request('screen').then(l => { wakeLock = l; }).catch(() => {}); }catch(e){}
+  }
+  function exitPlayer(){
+    if(!playerMode) return;
+    playerMode = false;
+    document.body.classList.remove('player');
+    bExit.hidden = true; pHint.classList.add('fade');
+    par.tx = 0; par.ty = 0;
+    controls.enabled = true;
+    tweenTo(homeView());
+    try{ if(document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {}); }catch(e){}
+    try{ if(wakeLock){ wakeLock.release().catch(() => {}); wakeLock = null; } }catch(e){}
+  }
+  $('#bPlayer').addEventListener('click', enterPlayer);
+  bExit.addEventListener('click', exitPlayer);
+  document.addEventListener('keydown', e => {
+    if(e.key !== 'Escape') return;
+    if(sheetOpen) hideSheet();
+    else if(rackMode) chooseTape(current);
+    else exitPlayer();
+  });
+  ui.auto.setAttribute('aria-pressed', String(controls.autoRotate));
+  controls.addEventListener('start', () => {
+    camTween = null;
+    if(controls.autoRotate){ controls.autoRotate = false; ui.auto.setAttribute('aria-pressed', 'false'); }
+  });
+
+  // ---------- picking ----------
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+  // ---------- tape rack: a wooden rack on a desk, every tape in 3D ----------
+  const degR = THREE.MathUtils.degToRad;
+  const PALETTE = ['#e2553b', '#2f6f73', '#d9a441', '#5b6fa8', '#7a8f5c', '#b0566f', '#3d3f44'];
+  const demoRec = {id:'demo', demo:true, title:'秋の帰り道 mix', sub:'2026.10  for the walk home', color:'#e2553b', pos:0, mins:1};
+  const tapes = [demoRec];
+  let current = demoRec, rackMode = false, returnTo = 'orbit', busy = false;
+  const casAnim = {pop:0, fly:0};
+
+  // saved tapes live in this browser (IndexedDB); if storage is unavailable the rack still works for this visit
+  const store = {db:null};
+  function idbOpen(){
+    return new Promise((res, rej) => {
+      try{
+        const r = indexedDB.open('sorane-tape-rack', 1);
+        r.onupgradeneeded = () => r.result.createObjectStore('tapes', {keyPath:'id'});
+        r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+      }catch(e){ rej(e); }
+    });
+  }
+  function idbDo(mode, fn){
+    return new Promise((res, rej) => {
+      try{
+        const tx = store.db.transaction('tapes', mode); const req = fn(tx.objectStore('tapes'));
+        tx.oncomplete = () => res(req && req.result); tx.onerror = () => rej(tx.error);
+      }catch(e){ rej(e); }
+    });
+  }
+  (async () => {
+    try{
+      store.db = await idbOpen();
+      const all = await idbDo('readonly', s => s.getAll());
+      (all || []).sort((a, b) => a.created - b.created).forEach(r => tapes.push(r));
+      if(rackMode){ buildRack(); fitRackCam(); }
+    }catch(e){ store.db = null; }
+  })();
+  function saveTape(rec){
+    if(!store.db || rec.demo) return;
+    const plain = {id:rec.id, title:rec.title, sub:rec.sub, color:rec.color, files:rec.files, pos:rec.pos, mins:rec.mins, created:rec.created};
+    idbDo('readwrite', s => s.put(plain)).catch(() => {});
+  }
+  function dropTape(rec){ if(store.db && !rec.demo) idbDo('readwrite', s => s.delete(rec.id)).catch(() => {}); }
+
+  function decode(blob){
+    return blob.arrayBuffer().then(ab => new Promise((res, rej) => {
+      const p = ac.decodeAudioData(ab, res, rej); if(p && p.then) p.then(res, rej);
+    }));
+  }
+  function durationOf(blob){
+    return new Promise(res => {
+      let url = null, done = false;
+      const fin = d => { if(done) return; done = true; try{ if(url) URL.revokeObjectURL(url); }catch(e){} res(d); };
+      try{
+        const a = document.createElement('audio'); a.preload = 'metadata';
+        a.onloadedmetadata = () => fin(isFinite(a.duration) ? a.duration : 0);
+        a.onerror = () => fin(0);
+        url = URL.createObjectURL(blob); a.src = url;
+        setTimeout(() => fin(0), 4000);
+      }catch(e){ fin(0); }
+    }).then(d => d > 0 ? d : decode(blob).then(b => b.duration).catch(() => 0));
+  }
+  async function prepareTape(rec){
+    if(rec.demo){ await demoReady; return; }
+    let changed = false;
+    for(const f of rec.files || []){ if(!(f.dur > 0)){ f.dur = await durationOf(f.blob); changed = true; } }
+    if(changed) saveTape(rec);
+  }
+
+  // ----- textures -----
+  function woodTex(base, dark, seed){
+    const t = canvasTex(512, 512, (g, w, h) => {
+      g.fillStyle = base; g.fillRect(0, 0, w, h);
+      let s = seed; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
+      for(let i = 0; i < 110; i++){
+        const y = r() * h, amp = 2 + r() * 7, ph = r() * 6, k = 1 + Math.floor(r() * 3);
+        g.globalAlpha = 0.04 + r() * 0.13; g.strokeStyle = dark; g.lineWidth = 1 + r() * 4;
+        g.beginPath(); g.moveTo(0, y);
+        for(let x = 0; x <= w; x += 16) g.lineTo(x, y + Math.sin(x / w * Math.PI * 2 * k + ph) * amp);
+        g.stroke();
+      }
+      g.globalAlpha = 1;
+    });
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    return t;
+  }
+  const spineCache = new Map();
+  function spineTex(rec){
+    if(spineCache.has(rec.id)) return spineCache.get(rec.id);
+    const t = canvasTex(1100, 170, (g, w, h) => {
+      g.fillStyle = '#efe7d3'; g.fillRect(0, 0, w, h);
+      g.fillStyle = rec.color; g.fillRect(0, 0, 150, h); g.fillRect(150, h - 14, w, 14);
+      g.fillStyle = '#fbf4ea'; g.font = '700 58px "Zen Kaku Gothic New", sans-serif'; g.textAlign = 'center';
+      g.fillText('A', 75, 106);
+      g.textAlign = 'left'; g.fillStyle = '#2a2c2f';
+      let fs = 64; g.font = `400 ${fs}px Yomogi, cursive`;
+      while(fs > 34 && g.measureText(rec.title).width > 720){ fs -= 2; g.font = `400 ${fs}px Yomogi, cursive`; }
+      let tt = rec.title; while(tt.length > 1 && g.measureText(tt).width > 720) tt = tt.slice(0, -2) + '…';
+      g.fillText(tt, 180, 104);
+      g.font = '500 30px "IBM Plex Mono", monospace'; g.textAlign = 'right'; g.fillStyle = 'rgba(42,44,47,.65)';
+      g.fillText(rec.demo ? 'DEMO' : `${rec.mins} MIN`, 1075, 98);
+    });
+    spineCache.set(rec.id, t);
+    return t;
+  }
+  const newTapeTex = canvasTex(1000, 620, (g, w, h) => {
+    g.fillStyle = '#e8e4da'; g.fillRect(0, 0, w, h);
+    roundRect(g, 40, 28, 920, 404, 18); g.fillStyle = '#fbf8f1'; g.fill();
+    g.strokeStyle = 'rgba(42,44,47,.18)'; g.lineWidth = 2;
+    [150, 230, 310].forEach(y => { g.beginPath(); g.moveTo(90, y); g.lineTo(910, y); g.stroke(); });
+    g.fillStyle = '#e2553b'; g.font = '700 120px "Zen Kaku Gothic New", sans-serif'; g.textAlign = 'center';
+    g.fillText('+', 500, 190);
+    g.fillStyle = '#2a2c2f'; g.font = '400 46px Yomogi, cursive';
+    g.fillText('新しいテープ', 500, 300);
+    g.font = '500 24px "IBM Plex Mono", monospace'; g.fillStyle = 'rgba(42,44,47,.6)';
+    g.fillText('TAP TO RECORD YOUR SONGS', 500, 380);
+    g.fillStyle = '#cfc9bc';
+    g.beginPath(); g.moveTo(190, 620); g.lineTo(240, 462); g.lineTo(760, 462); g.lineTo(810, 620); g.closePath(); g.fill();
+    g.fillStyle = '#9a958a';
+    [[290, 540, 34, 34], [676, 540, 34, 34], [468, 552, 64, 40]].forEach(r => g.fillRect(...r));
+  });
+
+  // ----- scene -----
+  const rackScene = new THREE.Scene();
+  rackScene.environment = scene.environment;
+  rackScene.add(new THREE.HemisphereLight(0xffe9cc, 0x2a2018, scene.environment ? 0.3 : 0.7));
+  const lamp = new THREE.DirectionalLight(0xffe2b8, 1.25);
+  lamp.castShadow = true; lamp.shadow.mapSize.set(1024, 1024);
+  lamp.shadow.bias = -0.0004; lamp.shadow.normalBias = 0.03; lamp.shadow.radius = 4;
+  rackScene.add(lamp, lamp.target);
+  const rackFill = new THREE.DirectionalLight(0x9fb8ff, 0.25); rackFill.position.set(18, 10, 14); rackScene.add(rackFill);
+  const rackCam = new THREE.PerspectiveCamera(32, 1, 0.5, 500);
+  const deskTex = woodTex('#b58a5a', '#6e4b2a', 3); deskTex.repeat.set(4, 4);
+  const deskMat = new THREE.MeshStandardMaterial({map:deskTex, roughness:0.62});
+  const rackWood = new THREE.MeshStandardMaterial({map:woodTex('#7a5233', '#2e1b0e', 9), roughness:0.5});
+  const caseMat = new THREE.MeshStandardMaterial({color:0x3e4146, roughness:0.2, metalness:0.05});
+  const caseEdge = new THREE.MeshStandardMaterial({color:0x26282b, roughness:0.3});
+  const wallMat = new THREE.MeshStandardMaterial({color:0x2c2a27, roughness:0.95});
+  [deskMat, rackWood, caseMat, caseEdge, wallMat].forEach(m => { m.envMapIntensity = 0.5; m.color.convertSRGBToLinear(); });
+  const desk = new THREE.Mesh(new THREE.PlaneGeometry(240, 240), deskMat);
+  desk.rotation.x = -Math.PI / 2; desk.receiveShadow = true; rackScene.add(desk);
+  const wall = new THREE.Mesh(new THREE.PlaneGeometry(240, 120), wallMat);
+  wall.position.set(0, 60, -14); wall.receiveShadow = true; rackScene.add(wall);
+
+  const PITCH = 2.1, IW = 11.6, ST = 0.6, DEP = 7.8;
+  let R = null, rackY = 5, rackYT = 5;
+  function buildRack(){
+    if(R){ rackScene.remove(R.root); R.root.traverse(o => { if(o.geometry) o.geometry.dispose(); if(o.userData.ownMat) o.material.forEach(m => { if(m.userData && m.userData.spine) m.dispose(); }); }); }
+    const W = stage.clientWidth, Hh = stage.clientHeight, portrait = Hh >= W;
+    const root = new THREE.Group(); rackScene.add(root);
+    const slots = Math.max(6, tapes.length + 1);
+    const H = 0.7 + slots * PITCH + 0.15, ow = IW + 2 * ST;
+    const add = (geo, mat, x, y, z) => { const m = shadowy(new THREE.Mesh(geo, mat)); m.position.set(x, y, z); root.add(m); return m; };
+    add(new THREE.BoxGeometry(ST, H, DEP), rackWood, -(IW / 2 + ST / 2), H / 2, -DEP / 2);
+    add(new THREE.BoxGeometry(ST, H, DEP), rackWood, IW / 2 + ST / 2, H / 2, -DEP / 2);
+    add(new THREE.BoxGeometry(ow, H, 0.35), rackWood, 0, H / 2, -DEP - 0.17);
+    add(new THREE.BoxGeometry(ow + 0.5, 0.55, DEP + 0.5), rackWood, 0, H + 0.27, -DEP / 2 + 0.1);
+    add(new THREE.BoxGeometry(ow + 0.5, 0.7, DEP + 0.5), rackWood, 0, 0.35, -DEP / 2 + 0.1);
+    for(let i = 1; i < slots; i++) add(new THREE.BoxGeometry(IW, 0.12, DEP - 0.3), rackWood, 0, 0.7 + i * PITCH, -DEP / 2 - 0.12);
+    const cases = {};
+    tapes.forEach((rec, i) => {
+      const y0 = 0.7 + i * PITCH + 0.06 + 0.85;
+      const g = new THREE.Group(); g.position.set(0, y0, 0); root.add(g);
+      const geo = new THREE.BoxGeometry(10.9, 1.7, 7); geo.translate(0, 0, -3.7);
+      const spineMat = new THREE.MeshStandardMaterial({map:spineTex(rec), roughness:0.35});
+      spineMat.envMapIntensity = 0.5; spineMat.userData.spine = true;
+      const m = shadowy(new THREE.Mesh(geo, [caseEdge, caseEdge, caseMat, caseMat, spineMat, caseEdge]));
+      m.userData.tapeId = rec.id; m.userData.ownMat = true;
+      g.add(m);
+      cases[rec.id] = {g, mesh:m, y0, slide:0, target:0, wasOut:false};
+    });
+    const blankGeo = new THREE.BoxGeometry(10, 6.2, 0.85);
+    const blankFront = new THREE.MeshStandardMaterial({map:newTapeTex, roughness:0.35}); blankFront.envMapIntensity = 0.5;
+    const shellLight = new THREE.MeshStandardMaterial({color:0xd8d3c7, roughness:0.4}); shellLight.color.convertSRGBToLinear(); shellLight.envMapIntensity = 0.5;
+    blankFront.userData.spine = true; shellLight.userData.spine = true;
+    const blank = shadowy(new THREE.Mesh(blankGeo, [shellLight, shellLight, shellLight, shellLight, blankFront, shellLight]));
+    blank.rotation.x = -Math.PI / 2; blank.rotation.z = portrait ? 0.08 : -0.12;
+    blank.position.set(portrait ? 0 : ow / 2 + 7.5, 0.43, portrait ? 5.2 : 1.2);
+    blank.userData.act = 'new'; blank.userData.ownMat = true; root.add(blank);
+    R = {root, cases, blank, H, slots, portrait};
+    lamp.position.set(-16, H + 26, 24);
+    lamp.target.position.set(0, H / 2, 0);
+    const m = H / 2 + 14;
+    Object.assign(lamp.shadow.camera, {left:-m, right:m, top:m, bottom:-m, near:5, far:140});
+    lamp.shadow.camera.updateProjectionMatrix();
+  }
+  function fitRackCam(){
+    if(!R) return;
+    const W = stage.clientWidth, Hh = stage.clientHeight, a = W / Hh;
+    rackCam.aspect = a; rackCam.fov = 32; rackCam.updateProjectionMatrix();
+    const vf = degR(16), hf = Math.atan(Math.tan(vf) * a);
+    R.dist = Math.max(8.4 / Math.tan(hf), 10.5 / Math.tan(vf));
+    R.minY = 4.5; R.maxY = Math.max(R.minY, R.H - 7);
+    rackYT = Math.max(R.minY, Math.min(R.maxY, rackYT));
+  }
+  const clampRack = y => Math.max(R.minY, Math.min(R.maxY, y));
+
+  // ----- sheet (in-page dialog) -----
+  const sheet = $('#sheet');
+  let sheetOpen = false;
+  function showSheet(build, buttons){
+    sheet.innerHTML = '';
+    const body = document.createElement('div'); body.className = 'sheet-body'; build(body); sheet.appendChild(body);
+    if(buttons.length){
+      const row = document.createElement('div'); row.className = 'sheet-actions';
+      buttons.forEach(b => {
+        const el = document.createElement('button'); el.type = 'button';
+        el.className = 'chip' + (b.kind ? ' ' + b.kind : ''); el.textContent = b.label;
+        el.addEventListener('click', () => { hideSheet(); if(b.fn) b.fn(); });
+        row.appendChild(el);
+      });
+      sheet.appendChild(row);
+    }
+    sheet.hidden = false; sheetOpen = true;
+  }
+  function hideSheet(){ sheet.hidden = true; sheetOpen = false; }
+  function para(parent, cls, text){ const p = document.createElement('p'); p.className = cls; p.textContent = text; parent.appendChild(p); return p; }
+
+  // ----- making a tape from your songs -----
+  function newTape(){ ensureAudio(); fileIn.click(); }
+  const fileIn = document.createElement('input');
+  fileIn.type = 'file'; fileIn.accept = 'audio/*'; fileIn.multiple = true; fileIn.hidden = true;
+  document.body.appendChild(fileIn);
+  fileIn.addEventListener('change', async () => {
+    const files = [...fileIn.files]; fileIn.value = '';
+    if(!files.length) return;
+    ensureAudio();
+    if(!ac){ showSheet(b => para(b, 'sheet-title', 'この環境では音声を読み込めません。'), [{label:'閉じる'}]); return; }
+    showSheet(b => { para(b, 'sheet-title', 'カセットに録音しています…'); para(b, 'sheet-sub', `${files.length} 曲`); }, []);
+    const list = [];
+    for(const f of files){
+      const dur = await durationOf(f);
+      if(dur > 0) list.push({name:f.name.replace(/\.[^.]+$/, ''), blob:f, dur});
+    }
+    if(!list.length){
+      showSheet(b => para(b, 'sheet-title', '読み込めるファイルがありませんでした。mp3、m4a、wav などの音声ファイルを選んでください。'), [{label:'閉じる'}]);
+      return;
+    }
+    const mins = Math.max(1, Math.round(list.reduce((a, t) => a + t.dur, 0) / 60));
+    const def = list.length === 1 ? list[0].name : `${list[0].name} ほか${list.length - 1}曲`;
+    let input;
+    showSheet(b => {
+      para(b, 'sheet-title', '新しいテープ');
+      para(b, 'sheet-sub', `${list.length} 曲 · 約 ${mins} 分`);
+      const lab = document.createElement('label'); lab.htmlFor = 'tapeTitle'; lab.textContent = 'ラベルに書く名前'; b.appendChild(lab);
+      input = document.createElement('input'); input.id = 'tapeTitle'; input.type = 'text'; input.maxLength = 40; input.value = def;
+      b.appendChild(input);
+    }, [
+      {label:'やめる'},
+      {label:'テープを作る', kind:'primary', fn:() => createTape(list, (input.value || '').trim() || def, mins)}
+    ]);
+  });
+  function createTape(list, title, mins){
+    const rec = {
+      id:'t' + Date.now().toString(36), title,
+      sub:`${list.length} TRACK${list.length > 1 ? 'S' : ''}  ·  ${mins} MIN`,
+      color:PALETTE[tapes.length % PALETTE.length],
+      files:list.map(t => ({name:t.name, blob:t.blob, dur:t.dur})), pos:0, mins, created:Date.now()
+    };
+    tapes.push(rec); saveTape(rec);
+    buildRack(); fitRackCam();
+    const c = R.cases[rec.id]; c.slide = 1.6; c.target = 0; c.wasOut = true;
+    rackYT = clampRack(c.y0);
+    sfx('slide');
+  }
+  function askDelete(id){
+    const rec = tapes.find(t => t.id === id); if(!rec || rec.demo) return;
+    showSheet(b => {
+      para(b, 'sheet-title', `「${rec.title}」を捨てますか？`);
+      para(b, 'sheet-sub', 'ラックから消え、録音した曲もこのブラウザから削除されます。');
+    }, [
+      {label:'やめる'},
+      {label:'捨てる', kind:'danger', fn:() => {
+        tapes.splice(tapes.indexOf(rec), 1); dropTape(rec);
+        const t = spineCache.get(rec.id); if(t) t.dispose(); spineCache.delete(rec.id);
+        if(current === rec) current = demoRec;
+        buildRack(); fitRackCam(); sfx('rackIn');
+      }}
+    ]);
+  }
+
+  // ----- tweens + fades -----
+  const tweens = [];
+  function tween(obj, key, to, dur, ease, done){
+    for(let i = tweens.length - 1; i >= 0; i--) if(tweens[i].obj === obj && tweens[i].key === key) tweens.splice(i, 1);
+    tweens.push({obj, key, from:obj[key], to, dur:reduceMotion ? 0.01 : dur, t:0, ease, done});
+  }
+  function runTweens(dt){
+    for(let i = tweens.length - 1; i >= 0; i--){
+      const w = tweens[i]; w.t += dt;
+      const k = Math.min(1, w.t / w.dur);
+      const e = w.ease === 'in' ? k * k * k : w.ease === 'out' ? 1 - Math.pow(1 - k, 3) : (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
+      w.obj[w.key] = w.from + (w.to - w.from) * e;
+      if(k >= 1){ tweens.splice(i, 1); if(w.done) w.done(); }
+    }
+  }
+  const fadeEl = $('#fade');
+  function fadeSwap(fn){
+    fadeEl.classList.add('on');
+    setTimeout(() => {
+      try{ const r = fn(); if(r && r.catch) r.catch(err => { console.error(err); busy = false; }); }
+      catch(err){ console.error(err); busy = false; }
+      finally{ requestAnimationFrame(() => requestAnimationFrame(() => fadeEl.classList.remove('on'))); }
+    }, reduceMotion ? 20 : 300);
+  }
+  const later = (ms, fn) => setTimeout(fn, reduceMotion ? 0 : ms);
+
+  // ----- eject → rack, rack → insert -----
+  function ejectToRack(){
+    if(busy || rackMode) return;
+    busy = true;
+    ensureAudio();
+    if(state.mode !== 'stop') setMode('stop');
+    const wasOpen = !!state.doorTarget;
+    if(!wasOpen) setDoor(true);
+    current.pos = state.pos; saveTape(current);
+    later(wasOpen ? 0 : 380, () => {
+      sfx('eject');
+      tween(casAnim, 'pop', 1, 0.16, 'out');
+      later(520, () => {
+        sfx('slide');
+        tween(casAnim, 'fly', 1, 0.42, 'in');
+        later(260, () => fadeSwap(enterRack));
+      });
+    });
+  }
+  function enterRack(){
+    returnTo = playerMode ? 'player' : 'orbit';
+    rackMode = true;
+    document.body.classList.add('rack');
+    bExit.hidden = true;
+    controls.enabled = false;
+    casAnim.pop = 0;
+    buildRack(); fitRackCam();
+    const c = R.cases[current.id];
+    if(c){ c.slide = 1.5; c.target = 0; c.wasOut = true; rackY = rackYT = clampRack(c.y0); }
+    else rackY = rackYT = R.minY;
+    flashHint('テープをタップして入れる。長押しで捨てる。手前の空テープで新しく作れます。');
+    busy = false;
+  }
+  function chooseTape(rec){
+    if(busy || !rec) return;
+    busy = true;
+    ensureAudio();
+    const c = R && R.cases[rec.id];
+    if(c){ c.target = 1.2; sfx('slide'); }
+    later(430, () => fadeSwap(() => leaveRack(rec)));
+  }
+  async function leaveRack(rec){
+    rackMode = false;
+    document.body.classList.remove('rack');
+    if(returnTo === 'player'){ bExit.hidden = false; }
+    else { controls.enabled = true; }
+    pHint.classList.add('fade');
+    state.doorTarget = 1; state.door = 1; syncUI();
+    casAnim.pop = 0; casAnim.fly = 1;
+    current = rec;
+    try{ await Promise.race([prepareTape(rec), new Promise(r => setTimeout(r, 8000))]); }catch(e){}
+    setTape(rec);
+    state.pos = Math.min(rec.pos || 0, tape.total);
+    later(120, () => {
+      tween(casAnim, 'fly', 0, 0.36, 'in', () => {
+        sfx('insert');
+        later(300, () => { setDoor(false); busy = false; });
+      });
+    });
+  }
+  $('#bRackBack').addEventListener('click', () => { if(rackMode && !sheetOpen) chooseTape(current); });
+  $('#bSongs').addEventListener('click', ejectToRack);
+
+  function rackPick(e){
+    if(!R) return null;
+    const r = renderer.domElement.getBoundingClientRect();
+    ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(ndc, rackCam);
+    const objs = Object.values(R.cases).map(c => c.mesh); objs.push(R.blank);
+    const h = ray.intersectObjects(objs, false)[0];
+    return h ? h.object : null;
+  }
+  function updateRack(dt){
+    Object.values(R.cases).forEach(c => {
+      c.slide += (c.target - c.slide) * Math.min(1, dt * 9);
+      if(c.slide > 0.5) c.wasOut = true;
+      if(c.target === 0 && c.wasOut && c.slide < 0.05){ c.wasOut = false; sfx('rackIn'); }
+      c.g.position.z = c.slide * 6.5;
+      c.g.position.y = c.y0 + c.slide * 1.3;
+      c.g.rotation.x = -c.slide * 0.22;
+    });
+    rackY += (rackYT - rackY) * Math.min(1, dt * 10);
+    rackCam.position.set(0, rackY + R.dist * 0.3, R.dist);
+    rackCam.lookAt(0, rackY, 0);
+  }
+
+  const pickables = [];
+  Object.values(keys).forEach(k => { pickables.push(k.mesh); k.mesh.children.forEach(c => pickables.push(c)); });
+  [door, glass, doorText].forEach(m => { m.userData.act = 'door'; pickables.push(m); });
+  mainCas.shell.userData.act = 'cassette'; pickables.push(mainCas.shell);
+  pickables.push(wheel);
+  function pick(e){
+    const r = renderer.domElement.getBoundingClientRect();
+    ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    if(playerMode && pm){ ray.setFromCamera(ndc, pmCam); }
+    else ray.setFromCamera(ndc, camera);
+    const hit = ray.intersectObjects(playerMode && pm ? pm.picks : pickables, false)[0];
+    return hit ? hit.object.userData.act : null;
+  }
+  let down = null;
+  let rackDown = null, lpTimer = 0;
+  renderer.domElement.addEventListener('pointerdown', e => {
+    if(rackMode){
+      if(!R || busy || sheetOpen) return;
+      ensureAudio();
+      const o = rackPick(e);
+      rackDown = {x:e.clientX, y:e.clientY, y0:rackYT, obj:o, moved:false, long:false};
+      try{ renderer.domElement.setPointerCapture(e.pointerId); }catch(err){}
+      clearTimeout(lpTimer);
+      if(o && o.userData.tapeId && o.userData.tapeId !== 'demo'){
+        lpTimer = setTimeout(() => {
+          if(rackDown && rackDown.obj === o && !rackDown.moved){ rackDown.long = true; sfx('tick'); askDelete(o.userData.tapeId); }
+        }, 600);
+      }
+      return;
+    }
+    down = {x:e.clientX, y:e.clientY, t:performance.now(), wheel:false};
+    if(playerMode){
+      try{ renderer.domElement.setPointerCapture(e.pointerId); }catch(err){}
+      if(pick(e) === 'vol'){ down.wheel = true; down.vol = state.vol; down.angle = state.wheelTarget || 0; }
+    }
+  });
+  renderer.domElement.addEventListener('pointermove', e => {
+    if(rackMode){
+      if(!rackDown || !R) return;
+      const dx = e.clientX - rackDown.x, dy = e.clientY - rackDown.y;
+      if(Math.hypot(dx, dy) > 7) rackDown.moved = true;
+      const upp = 2 * R.dist * Math.tan(degR(16)) / stage.clientHeight;
+      rackYT = clampRack(rackDown.y0 + dy * upp);
+      return;
+    }
+    if(!playerMode || !down || !pm) return;
+    const dx = e.clientX - down.x, dy = e.clientY - down.y;
+    if(down.wheel){
+      const upx = pm.fh / stage.clientHeight / 1.5;
+      const along = pm.portrait ? -dy : dx;
+      state.wheelTarget = down.angle + (pm.portrait ? dy : dx) * upx;
+      const v = Math.max(1, Math.min(10, down.vol + Math.round(along / 22)));
+      if(v !== state.vol){
+        ensureAudio();
+        state.vol = v; sfx('tick'); setBed();
+      }
+      return;
+    }
+    par.tx = Math.max(-2, Math.min(2, -dx * 0.012));
+    par.ty = Math.max(-2, Math.min(2, dy * 0.012));
+  });
+  const release = e => {
+    if(rackMode){
+      clearTimeout(lpTimer);
+      const d = rackDown; rackDown = null;
+      if(d && !d.moved && !d.long && e.type === 'pointerup' && d.obj && !busy && !sheetOpen){
+        if(d.obj.userData.act === 'new') newTape();
+        else chooseTape(tapes.find(t => t.id === d.obj.userData.tapeId));
+      }
+      return;
+    }
+    if(!down) return;
+    const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
+    const quick = performance.now() - down.t < 450;
+    const wasWheel = down.wheel;
+    down = null;
+    par.tx = 0; par.ty = 0;
+    if(e.type === 'pointerup' && moved < 7 && quick && !(wasWheel && moved > 2)){ const a = pick(e); if(a) press(a); }
+  };
+  renderer.domElement.addEventListener('pointerup', release);
+  renderer.domElement.addEventListener('pointercancel', release);
+  let lastHover = 0;
+  renderer.domElement.addEventListener('pointermove', e => {
+    if(e.pointerType !== 'mouse' || e.buttons) return;
+    const now = performance.now(); if(now - lastHover < 60) return; lastHover = now;
+    renderer.domElement.classList.toggle('hot', rackMode ? !!rackPick(e) : !!pick(e));
+  });
+
+  // ---------- resize ----------
+  function onResize(){
+    const w = stage.clientWidth, h = stage.clientHeight;
+    renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();
+    if(playerMode) buildPM();
+    if(rackMode){ buildRack(); fitRackCam(); }
+  }
+  window.addEventListener('resize', onResize);
+
+  // ---------- loop ----------
+  const clock = new THREE.Clock();
+  let wheelAngle = 0;
+  syncUI();
+  let busyT = 0, tickErr = false;
+  function tick(){
+    requestAnimationFrame(tick);
+    try{ frame(); }catch(err){ if(!tickErr){ tickErr = true; console.error(err); } }
+  }
+  function frame(){
+    const dt = Math.min(clock.getDelta(), 0.05);
+    if(busy){ busyT += dt; if(busyT > 10){ busy = false; fadeEl.classList.remove('on'); } } else busyT = 0;
+
+    // tape transport
+    let v = 0;
+    const md = state.mode;
+    if(md === 'play'){
+      v = 2.0;
+      if(ac && tape.ready && ac.state === 'running'){ if(!deck.loading) state.pos = Math.max(state.pos, deck.startPos + Math.max(0, ac.currentTime - deck.startTime)); }
+      else state.pos += dt;
+    } else if(md === 'ff' || md === 'rew'){
+      v = md === 'ff' ? 18 : -18;
+      state.pos += (md === 'ff' ? 30 : -30) * dt;
+    }
+    if(state.pos >= tape.total){
+      state.pos = tape.total;
+      if(md !== 'stop'){ setMode('stop'); sfx('stop'); say('AUTO STOP: テープの終わりで止まりました。'); }
+    }
+    if(state.pos <= 0){ state.pos = 0; if(md === 'rew'){ setMode('stop'); sfx('stop'); } }
+    const p = state.pos / tape.total;
+    const rL = 0.72 + 1.08 * (1 - p), rR = 0.72 + 1.08 * p;
+    [mainCas, pm && pm.cas].forEach(c => {
+      if(!c) return;
+      c.reelL.pack.scale.set(rL, 1, rL); c.reelR.pack.scale.set(rR, 1, rR);
+      if(v){ c.reelL.hub.rotation.z -= (v / rL) * dt; c.reelR.hub.rotation.z -= (v / rR) * dt; }
+    });
+    const cn = Math.floor(state.pos) % 1000;
+    ui.ctr.textContent = String(cn).padStart(3, '0');
+    if(cn !== ctrShown){ ctrShown = cn; drawCounter(cn); }
+
+    // keys
+    Object.entries(keys).forEach(([id, k]) => {
+      if(k.flash > 0) k.flash -= dt;
+      const goal = Math.max(k.target, k.flash > 0 ? 1 : 0, (id === 'ff' && state.mode === 'ff') || (id === 'rew' && state.mode === 'rew') ? 1 : 0);
+      k.down += (goal - k.down) * Math.min(1, dt * 22);
+      k.mesh.position.y = TOP - 0.2 - k.down * 0.24;
+      if(pm && pm.keys[id]) pm.keys[id].position.z = 0.2 - k.down * 0.4;
+    });
+
+    // door
+    state.door += (state.doorTarget - state.door) * Math.min(1, dt * 7);
+    const ease = state.door;
+    doorPivot.rotation.x = ease * 1.05;
+    runTweens(dt);
+    const pop = casAnim.pop, fly = casAnim.fly;
+    mainCas.group.position.set(0, 3.4 + pop * 1.5 + fly * 17, -0.95 + pop * 0.3 + fly * fly * 10);
+    mainCas.group.rotation.x = -fly * 0.3;
+    mainCas.group.visible = fly < 0.98;
+    if(pm){
+      pm.door.rotation.x = ease * 1.0;
+      pm.cas.group.position.set(0, pm.casY + pop * 1.6 + fly * 18, -1.3 + pop * 0.3 + fly * fly * 14);
+      pm.cas.group.rotation.x = -fly * 0.3;
+      pm.cas.group.visible = fly < 0.98;
+    }
+
+    // wheel
+    if(state.wheelTarget !== undefined){
+      wheelAngle += (state.wheelTarget - wheelAngle) * Math.min(1, dt * 14);
+      wheel.rotation.y = wheelAngle;
+      if(pm){ if(pm.wheelAxis === 'x') pm.wheel.rotation.x = wheelAngle; else pm.wheel.rotation.y = wheelAngle; }
+    }
+
+    // led
+    led.material.emissiveIntensity += ((state.mode !== 'stop' ? 2.4 : 0) - led.material.emissiveIntensity) * Math.min(1, dt * 10);
+
+    // camera tween (orbit view)
+    if(camTween){
+      const c = camTween;
+      c.t = Math.min(1, c.t + dt * (reduceMotion ? 6 : 1.4));
+      const e = c.t < 0.5 ? 4 * c.t * c.t * c.t : 1 - Math.pow(-2 * c.t + 2, 3) / 2;
+      camera.position.lerpVectors(c.p0, c.p1, e);
+      camera.up.lerpVectors(c.u0, c.u1, e).normalize();
+      camera.fov = c.f0 + (c.f1 - c.f0) * e; camera.updateProjectionMatrix();
+      camTarget.lerpVectors(c.t0, c.t1, e);
+      camera.lookAt(camTarget);
+      if(c.t >= 1){ camTween = null; camera.up.copy(c.u1); if(c.done) c.done(); }
+    } else if(controls.enabled){
+      controls.update();
+    }
+
+    renderer.shadowMap.needsUpdate = true;
+    if(rackMode && R){
+      updateRack(dt);
+      renderer.render(rackScene, rackCam);
+    } else if(playerMode && pm){
+      appear = Math.min(1, appear + dt * 1.6);
+      const e = 1 - Math.pow(1 - appear, 3);
+      const pk = Math.min(1, dt * (down ? 14 : 5));
+      par.x += (par.tx - par.x) * pk; par.y += (par.ty - par.y) * pk;
+      pmCam.position.set(par.x, par.y, pm.dist * (1 + 0.5 * (1 - e)));
+      pmCam.up.set(Math.sin((1 - e) * 0.25), Math.cos((1 - e) * 0.25), 0);
+      pmCam.lookAt(par.x * 0.2, par.y * 0.2, 0);
+      renderer.render(pmScene, pmCam);
+    } else {
+      renderer.render(scene, camera);
+    }
+  }
+  if((window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone) enterPlayer();
+  renderer.domElement.addEventListener('webglcontextlost', e => {
+    e.preventDefault();
+    const l = $('#loading'); l.hidden = false; l.style.zIndex = 7;
+    l.textContent = '画面の描画が止まりました。ページを再読み込みすると元に戻ります。作ったテープは残っています。';
+  });
+  tick();
+}
+})();
+</script>
+
+<script>
+if('serviceWorker' in navigator){ addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); }); }
+document.addEventListener('gesturestart', e => e.preventDefault());
+</script>
+</body>
+</html>
