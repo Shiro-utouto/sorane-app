@@ -1624,17 +1624,15 @@ function init(){
     current.pos = state.pos; saveTape(current);
     const closed = !state.doorTarget;
     sequence([
-      // 1. door unlatches and swings open
-      [wasPlaying ? 380 : 0, () => { if(closed) setDoor(true); }],
-      // 2. it opens all the way
-      [closed ? 650 : 0, () => tween(casAnim, 'wide', 1, 0.55, 'inout')],
-      // 3. the spring kicks the cassette up out of its seat
-      [650, () => { sfx('eject'); tween(casAnim, 'tilt', 1, 0.2, 'out'); tween(casAnim, 'out', 0.35, 0.2, 'out'); }],
-      // 4. it is lifted clear of the bay
-      [520, () => { sfx('lift'); tween(casAnim, 'tilt', 0, 0.45, 'inout'); tween(casAnim, 'out', 1, 0.55, 'inout'); }],
-      // 5. and carried away
-      [800, () => { sfx('slide'); tween(casAnim, 'slide', 1, 0.8, 'in'); }],
-      [650, () => fadeSwap(enterRack)]
+      // 1. door unlatches and swings all the way open in one motion
+      [wasPlaying ? 300 : 0, () => { if(closed) setDoor(true); tween(casAnim, 'wide', 1, 0.45, 'out'); }],
+      // 2. the spring kicks the cassette up out of its seat
+      [closed ? 420 : 120, () => { sfx('eject'); tween(casAnim, 'tilt', 1, 0.14, 'out'); tween(casAnim, 'out', 0.35, 0.14, 'out'); }],
+      // 3. it is lifted clear of the bay
+      [260, () => { sfx('lift'); tween(casAnim, 'tilt', 0, 0.3, 'inout'); tween(casAnim, 'out', 1, 0.32, 'out'); }],
+      // 4. and carried away
+      [330, () => { sfx('slide'); tween(casAnim, 'slide', 1, 0.5, 'in'); }],
+      [380, () => fadeSwap(enterRack)]
     ]);
   }
   function enterRack(){
@@ -1676,10 +1674,9 @@ function init(){
       [450, () => { sfx('slide'); tween(casAnim, 'slide', 0, 0.85, 'out'); }],
       // 2. lined up, then pushed home — スチャッ
       [1100, () => tween(casAnim, 'out', 0, 0.2, 'in', () => sfx('insert'))],
-      // 3. the door comes back up and closes with a click
-      [750, () => tween(casAnim, 'wide', 0, 0.5, 'inout')],
-      [450, () => setDoor(false)],
-      [900, () => { busy = false; }]
+      // 3. the door comes back up and shuts with a click
+      [450, () => { tween(casAnim, 'wide', 0, 0.25, 'out'); setDoor(false); }],
+      [550, () => { busy = false; }]
     ]);
   }
   $('#bRackBack').addEventListener('click', () => { if(rackMode && !sheetOpen) chooseTape(current); });
@@ -1855,7 +1852,7 @@ function init(){
     });
 
     // door
-    state.door += (state.doorTarget - state.door) * Math.min(1, dt * 4.2);
+    state.door += (state.doorTarget - state.door) * Math.min(1, dt * (state.doorTarget ? 5.5 : 8.5));
     if(state.latch && state.doorTarget === 0 && state.door < 0.04){ state.latch = false; sfx('close'); }
     const ease = state.door;
     doorPivot.rotation.x = ease * (1.05 + casAnim.wide * 0.45);
