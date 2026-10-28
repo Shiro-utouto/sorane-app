@@ -147,6 +147,24 @@ body.rack .rackbar{display:flex}
 .sheet input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .sheet-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
 .chip.danger{border-color:#d64a3a;background:rgba(214,74,58,.24)}
+.chip:disabled{opacity:.4;cursor:default}
+.sheet-sub.warn{color:#f08a6e}
+.tracklist{display:grid;gap:6px;max-height:min(38vh,300px);overflow-y:auto;margin-top:4px;-webkit-overflow-scrolling:touch}
+.track{
+  display:grid;grid-template-columns:1.7em minmax(0,1fr) auto auto;align-items:center;gap:8px;
+  padding:6px 6px 6px 10px;border:1px solid var(--line);border-radius:10px;background:rgba(0,0,0,.28);font-size:13px;
+}
+.track .no,.track .du{font-family:var(--f-mono);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.track .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.track .ops{display:flex;gap:2px}
+.iconbtn{
+  font:inherit;font-size:14px;width:32px;height:32px;border-radius:8px;
+  border:1px solid transparent;background:transparent;color:var(--ink);cursor:pointer;
+}
+.iconbtn:hover{border-color:var(--line)}
+.iconbtn:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.iconbtn:disabled{opacity:.25;cursor:default}
+.addbtn{justify-self:start;font-size:12px;padding:8px 13px}
 @media (prefers-reduced-motion: reduce){#fade{transition:none}}
 
 @media (prefers-reduced-motion: reduce){.chip,.dot{transition:none}}
@@ -1531,7 +1549,7 @@ function init(){
       const row = document.createElement('div'); row.className = 'sheet-actions';
       buttons.forEach(b => {
         const el = document.createElement('button'); el.type = 'button';
-        el.className = 'chip' + (b.kind ? ' ' + b.kind : ''); el.textContent = b.label;
+        el.className = 'chip' + (b.kind ? ' ' + b.kind : ''); el.textContent = b.label; el.disabled = !!b.disabled;
         el.addEventListener('click', () => { hideSheet(); if(b.fn) b.fn(); });
         row.appendChild(el);
       });
@@ -1543,39 +1561,112 @@ function init(){
   function para(parent, cls, text){ const p = document.createElement('p'); p.className = cls; p.textContent = text; parent.appendChild(p); return p; }
 
   // ----- making a tape from your songs -----
-  function newTape(){ ensureAudio(); fileIn.click(); }
+  // Listing audio file types (not audio/*) makes iPhone open Files directly instead of the photo/video menu.
+  const AUDIO_TYPES = '.mp3,.m4a,.aac,.wav,.aif,.aiff,.flac,.ogg,.opus,.caf';
   const fileIn = document.createElement('input');
-  fileIn.type = 'file'; fileIn.accept = 'audio/*'; fileIn.multiple = true; fileIn.hidden = true;
+  fileIn.type = 'file'; fileIn.accept = AUDIO_TYPES; fileIn.hidden = true;
   document.body.appendChild(fileIn);
+  let pickMode = 'single', draft = null;
+  const MAX_MIN = 120;
+  const fmt = sec => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
+
+  function newTape(){
+    if(busy || sheetOpen) return;
+    ensureAudio();
+    showSheet(b => {
+      para(b, 'sheet-title', '新しいテープ');
+      para(b, 'sheet-sub', '1曲だけのテープか、何曲か並べたプレイリストのテープかを選んでください。');
+    }, [
+      {label:'やめる'},
+      {label:'1曲', fn:() => pickSongs('single')},
+      {label:'プレイリスト', kind:'primary', fn:() => pickSongs('list')}
+    ]);
+  }
+  function pickSongs(mode){
+    pickMode = mode;
+    fileIn.multiple = mode !== 'single';
+    ensureAudio();
+    fileIn.click();
+  }
   fileIn.addEventListener('change', async () => {
     const files = [...fileIn.files]; fileIn.value = '';
     if(!files.length) return;
     ensureAudio();
     if(!ac){ showSheet(b => para(b, 'sheet-title', 'この環境では音声を読み込めません。'), [{label:'閉じる'}]); return; }
-    showSheet(b => { para(b, 'sheet-title', 'カセットに録音しています…'); para(b, 'sheet-sub', `${files.length} 曲`); }, []);
-    const list = [];
+    const mode = pickMode;
+    showSheet(b => { para(b, 'sheet-title', '曲を読み込んでいます…'); para(b, 'sheet-sub', `${files.length} 曲`); }, []);
+    const got = [];
     for(const f of files){
       const dur = await durationOf(f);
-      if(dur > 0) list.push({name:f.name.replace(/\.[^.]+$/, ''), blob:f, dur});
+      if(dur > 0) got.push({name:f.name.replace(/\.[^.]+$/, ''), blob:f, dur});
     }
-    if(!list.length){
+    if(mode === 'add' && draft){
+      draft.list.push(...got);
+      renderDraft(got.length < files.length ? '読み込めないファイルがあったので外しました。' : '');
+      return;
+    }
+    if(!got.length){
       showSheet(b => para(b, 'sheet-title', '読み込めるファイルがありませんでした。mp3、m4a、wav などの音声ファイルを選んでください。'), [{label:'閉じる'}]);
       return;
     }
-    const mins = Math.max(1, Math.round(list.reduce((a, t) => a + t.dur, 0) / 60));
-    const def = list.length === 1 ? list[0].name : `${list[0].name} ほか${list.length - 1}曲`;
-    let input;
+    draft = {single:mode === 'single', list:got, title:null};
+    renderDraft(got.length < files.length ? '読み込めないファイルがあったので外しました。' : '');
+  });
+
+  function defaultTitle(){
+    const l = draft.list;
+    return l.length === 1 ? l[0].name : `${l[0].name} ほか${l.length - 1}曲`;
+  }
+  function renderDraft(note){
+    const l = draft.list;
+    if(!l.length){ draft = null; hideSheet(); return; }
+    const secs = l.reduce((a, t) => a + t.dur, 0), mins = Math.max(1, Math.round(secs / 60));
+    const tooLong = secs / 60 > MAX_MIN;
+    if(!draft.edited) draft.title = defaultTitle();
     showSheet(b => {
-      para(b, 'sheet-title', '新しいテープ');
-      para(b, 'sheet-sub', `${list.length} 曲 · 約 ${mins} 分`);
+      para(b, 'sheet-title', draft.single ? '1曲のテープ' : 'プレイリストのテープ');
+      const sub = para(b, 'sheet-sub', tooLong
+        ? `${l.length} 曲 · ${fmt(secs)}　カセットに入るのは ${MAX_MIN} 分（C-120）までです。曲を減らしてください。`
+        : `${l.length} 曲 · ${fmt(secs)} · ${cTypeOf(secs / 60)}`);
+      if(tooLong) sub.classList.add('warn');
+      if(note) para(b, 'sheet-sub', note);
+      if(!draft.single){
+        const box = document.createElement('div'); box.className = 'tracklist';
+        l.forEach((t, i) => {
+          const row = document.createElement('div'); row.className = 'track';
+          const no = document.createElement('span'); no.className = 'no'; no.textContent = String(i + 1).padStart(2, '0');
+          const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = t.name;
+          const du = document.createElement('span'); du.className = 'du'; du.textContent = fmt(t.dur);
+          const ops = document.createElement('span'); ops.className = 'ops';
+          const mk = (label, aria, dis, fn) => {
+            const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'iconbtn';
+            btn.textContent = label; btn.setAttribute('aria-label', aria); btn.disabled = dis;
+            btn.addEventListener('click', () => { fn(); sfx('tick'); renderDraft(); });
+            ops.appendChild(btn);
+          };
+          mk('↑', `${t.name} を上へ`, i === 0, () => { [l[i - 1], l[i]] = [l[i], l[i - 1]]; });
+          mk('↓', `${t.name} を下へ`, i === l.length - 1, () => { [l[i + 1], l[i]] = [l[i], l[i + 1]]; });
+          mk('×', `${t.name} を外す`, false, () => { l.splice(i, 1); });
+          row.append(no, nm, du, ops); box.appendChild(row);
+        });
+        b.appendChild(box);
+        const add = document.createElement('button'); add.type = 'button'; add.className = 'chip addbtn'; add.textContent = '＋ 曲を追加';
+        add.addEventListener('click', () => pickSongs('add'));
+        b.appendChild(add);
+      }
       const lab = document.createElement('label'); lab.htmlFor = 'tapeTitle'; lab.textContent = 'ラベルに書く名前'; b.appendChild(lab);
-      input = document.createElement('input'); input.id = 'tapeTitle'; input.type = 'text'; input.maxLength = 40; input.value = def;
+      const input = document.createElement('input'); input.id = 'tapeTitle'; input.type = 'text'; input.maxLength = 40; input.value = draft.title;
+      input.addEventListener('input', () => { draft.title = input.value; draft.edited = true; });
       b.appendChild(input);
     }, [
-      {label:'やめる'},
-      {label:'テープを作る', kind:'primary', fn:() => createTape(list, (input.value || '').trim() || def, mins)}
+      {label:'やめる', fn:() => { draft = null; }},
+      {label:'テープを作る', kind:'primary', disabled:tooLong, fn:() => {
+        const title = (draft.title || '').trim() || defaultTitle();
+        const list = draft.list; draft = null;
+        createTape(list, title, mins);
+      }}
     ]);
-  });
+  }
   function createTape(list, title, mins){
     const rec = {
       id:'t' + Date.now().toString(36), title,
