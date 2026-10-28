@@ -1031,9 +1031,10 @@ function init(){
     ensureAudio();
     if(busy || rackMode) return;
     const k = keys[id];
+    // a key that is already latched down can't go any further: just a light tap, nothing changes
+    if(k && ((id === 'play' && state.mode === 'play') || (id === state.mode && (id === 'ff' || id === 'rew')))){ sfx('tick'); return; }
     if(k){ k.flash = 0.18; sfx(id === 'stop' ? 'stop' : 'key'); }
     if(id === 'play'){
-      if(state.mode === 'play'){ setMode('stop'); return; }
       if(atEnd()){ say('テープの終わりです。◂◂ で巻き戻してから再生してください。'); syncUI(); return; }
       if(state.doorTarget) setDoor(false);
       setMode('play');
@@ -1042,7 +1043,6 @@ function init(){
       else if(state.doorTarget) ejectToRack();
       else setDoor(true);
     } else if(id === 'ff' || id === 'rew'){
-      if(state.mode === id){ setMode('stop'); return; }
       if(state.doorTarget) setDoor(false);
       setMode(id);
     } else if(id === 'door'){
@@ -1058,7 +1058,7 @@ function init(){
     }
   }
 
-  ui.play.addEventListener('click', () => press('play'));
+  ui.play.addEventListener('click', () => press(state.mode === 'play' ? 'stop' : 'play'));
   ui.door.addEventListener('click', () => { ensureAudio(); press('door'); });
   ui.auto.addEventListener('click', () => {
     controls.autoRotate = !controls.autoRotate;
