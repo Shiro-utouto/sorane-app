@@ -1,5 +1,5 @@
 // SR-28 offline cache. Bump VERSION whenever any app file changes.
-const VERSION = 'sr28-v9';
+const VERSION = 'sr28-v10';
 const SHELL = [
   './', './index.html', './manifest.webmanifest',
   './vendor/three.min.js', './vendor/OrbitControls.js', './vendor/RoomEnvironment.js',
